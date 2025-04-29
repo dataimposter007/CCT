@@ -3,24 +3,22 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm, type SubmitHandler, FormProvider } from 'react-hook-form'; // Import FormProvider
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // Keep Label import if used elsewhere, though FormLabel is preferred within FormField
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { FolderOpen, FileText, ChevronsRight, Sun, Moon, Eye, CodeXml, XCircle } from 'lucide-react'; // Added XCircle
+import { FolderOpen, FileText, ChevronsRight, Sun, Moon, Eye, CodeXml, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { savePaths, loadPaths } from '@/lib/path-persistence';
 import { convertCode } from './actions'; // Import server action
 import { useTheme } from 'next-themes';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox'; // Added Checkbox
-// Import Form and other necessary form components from the UI library
+import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 
@@ -166,8 +164,9 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 relative"> {/* Center content vertically and horizontally */}
-       {/* Theme Toggle Switch */}
+    // Use padding to create space around the central card instead of centering flex items
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 relative">
+       {/* Theme Toggle Switch - Positioned top right */}
        <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
             <Sun className="h-5 w-5" />
             <Switch
@@ -178,37 +177,38 @@ export default function Home() {
             <Moon className="h-5 w-5" />
         </div>
 
-      {/* Adjusted max-width and removed margin-top */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-sm bg-card/90 dark:bg-card/80 border border-border/50">
-        <CardHeader className="text-center border-b pb-6">
-           {/* Logo Placeholders */}
-           <div className="flex justify-center items-center space-x-6 mb-4">
+      {/* Card with increased max-width and slightly transparent background */}
+      <Card className="w-full max-w-3xl shadow-xl backdrop-blur-sm bg-card/80 dark:bg-card/70 border border-border/40 rounded-lg overflow-hidden"> {/* Adjusted max-width, transparency, border, rounded, overflow */}
+        <CardHeader className="text-center border-b pb-6 bg-card/90 dark:bg-card/80"> {/* Slightly less transparent header */}
+           {/* Logo Placeholders - Increased Size */}
+           <div className="flex justify-center items-center space-x-8 mb-6"> {/* Increased space-x and mb */}
                <Image
-                 src="https://picsum.photos/60/60?random=1" // Placeholder 1
+                 src="https://picsum.photos/80/80?random=1" // Increased size
                  alt="Logo 1"
-                 width={60}
-                 height={60}
-                 className="rounded-full shadow-md"
+                 width={80} // Increased size
+                 height={80} // Increased size
+                 className="rounded-full shadow-lg" // Increased shadow
                />
                <Image
-                 src="https://picsum.photos/60/60?random=2" // Placeholder 2
+                 src="https://picsum.photos/80/80?random=2" // Increased size
                  alt="Logo 2"
-                 width={60}
-                 height={60}
-                 className="rounded-full shadow-md"
+                 width={80} // Increased size
+                 height={80} // Increased size
+                 className="rounded-full shadow-lg" // Increased shadow
                />
            </div>
           {/* Title and Description */}
-          <div >
-              <CardTitle className="text-3xl sm:text-4xl font-bold text-primary">Playwright to Robot Converter</CardTitle>
-              <CardDescription className="text-muted-foreground mt-1">
+          <div>
+              <CardTitle className="text-3xl sm:text-4xl font-bold text-primary dark:text-primary-foreground/90">Playwright to Robot Converter</CardTitle> {/* Adjusted dark mode text color */}
+              <CardDescription className="text-muted-foreground mt-2"> {/* Increased mt */}
                 Select your files and output location to start the conversion.
               </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-8 px-6 sm:px-8"> {/* Increased padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
+             {/* Removed FormProvider duplicate wrap */}
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {/* Mapping File Input */}
                 <FormField
@@ -216,7 +216,7 @@ export default function Home() {
                   name="mappingFile"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-foreground">
+                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80"> {/* Adjusted text color */}
                         <FileText className="h-5 w-5 text-primary" />
                         Excel Mapping File (.xlsx)
                       </FormLabel>
@@ -225,7 +225,7 @@ export default function Home() {
                           <Input
                             placeholder="/path/to/your/mapping.xlsx"
                             {...field}
-                            className="flex-grow"
+                            className="flex-grow bg-background/70 dark:bg-background/60" /* Added slight background */
                           />
                           <Button type="button" variant="outline" onClick={() => handleBrowse('mappingFile')} className="shrink-0">
                             <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -246,7 +246,7 @@ export default function Home() {
                   name="inputFileOrFolder"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-foreground">
+                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80"> {/* Adjusted text color */}
                         <CodeXml className="h-5 w-5 text-primary" />
                         Playwright Python Input
                       </FormLabel>
@@ -255,7 +255,7 @@ export default function Home() {
                             <Input
                                 placeholder={form.getValues('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"}
                                 {...field}
-                                className="flex-grow"
+                                className="flex-grow bg-background/70 dark:bg-background/60" /* Added slight background */
                                 />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('inputFileOrFolder')} className="shrink-0">
                                 <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -275,7 +275,7 @@ export default function Home() {
                     control={form.control}
                     name="isSingleFile"
                     render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/30">
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/40 dark:bg-muted/30"> {/* Adjusted transparency */}
                             <FormControl>
                                 <Checkbox
                                 checked={field.value}
@@ -284,7 +284,7 @@ export default function Home() {
                                 />
                             </FormControl>
                             <div className="space-y-1 leading-none">
-                                <FormLabel htmlFor="isSingleFile" className="font-normal text-foreground/90 cursor-pointer">
+                                <FormLabel htmlFor="isSingleFile" className="font-normal text-foreground/80 dark:text-foreground/70 cursor-pointer"> {/* Adjusted text color */}
                                 The input path points to a single Python file (not a folder).
                                 </FormLabel>
                             </div>
@@ -299,7 +299,7 @@ export default function Home() {
                   name="outputFolder"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-foreground">
+                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80"> {/* Adjusted text color */}
                         <FolderOpen className="h-5 w-5 text-primary" />
                         Output Robot File Folder
                       </FormLabel>
@@ -308,7 +308,7 @@ export default function Home() {
                             <Input
                               placeholder="/path/to/output/robot_files"
                               {...field}
-                              className="flex-grow"
+                              className="flex-grow bg-background/70 dark:bg-background/60" /* Added slight background */
                             />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('outputFolder')} className="shrink-0">
                               <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -325,9 +325,9 @@ export default function Home() {
 
 
                 {/* Buttons Row */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t mt-8"> {/* Added border-t and mt-8 */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-8 border-border/40"> {/* Increased pt, Adjusted border transparency */}
                     {/* Convert Button */}
-                    <Button type="submit" disabled={isLoading} className="flex-grow text-base py-3"> {/* Increased size */}
+                    <Button type="submit" disabled={isLoading} className="flex-grow text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105"> {/* Added hover effect */}
                     {isLoading ? (
                         <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -350,20 +350,20 @@ export default function Home() {
                             type="button"
                             variant="secondary"
                             disabled={!conversionSuccess || isLoading}
-                            className="flex-grow text-base py-3" // Increased size
+                            className="flex-grow text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105" // Added hover effect
                             onClick={() => setIsViewModalOpen(true)} // Explicitly open dialog
                             >
                             <Eye className="mr-2 h-5 w-5" /> View Output
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[80vw] md:max-w-[70vw] lg:max-w-[60vw] max-h-[85vh] flex flex-col"> {/* Adjusted width */}
+                        <DialogContent className="sm:max-w-[80vw] md:max-w-[70vw] lg:max-w-[60vw] max-h-[85vh] flex flex-col bg-card/95 dark:bg-card/90 rounded-lg"> {/* Adjusted background and rounded */}
                             <DialogHeader>
                             <DialogTitle>Simulated Output (.robot)</DialogTitle>
                             <DialogDescription>
                                 This is a preview of the generated Robot Framework file content.
                             </DialogDescription>
                             </DialogHeader>
-                            <ScrollArea className="flex-grow border rounded-md p-4 my-4 bg-muted/30">
+                            <ScrollArea className="flex-grow border rounded-md p-4 my-4 bg-muted/50 dark:bg-muted/40"> {/* Adjusted background */}
                                 <pre className="text-sm whitespace-pre-wrap text-muted-foreground">{viewContent || 'No output generated yet.'}</pre>
                             </ScrollArea>
                             <DialogFooter>
@@ -383,6 +383,3 @@ export default function Home() {
     </main>
   );
 }
-    
-
-      
