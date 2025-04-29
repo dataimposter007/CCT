@@ -10,7 +10,7 @@ import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle, CardDescription
-import { FolderOpen, FileText, ChevronsRight, Sun, Moon, CodeXml, XCircle, Download, Info, Mail, Loader2 } from 'lucide-react'; // Added Info, Mail, Loader2
+import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Mail, Loader2, Sun, Moon } from 'lucide-react'; // Added Info, Mail, Loader2, Sun, Moon
 import { useToast } from '@/hooks/use-toast';
 import { savePaths, loadPaths } from '@/lib/path-persistence';
 import { convertCode } from './actions'; // Import server action
@@ -36,6 +36,8 @@ type FormValues = z.infer<typeof FormSchema>;
 function downloadFile(filename: string, content: string) {
     // Determine MIME type based on filename extension
     const mimeType = filename.endsWith('.zip') ? 'application/zip' : 'text/plain;charset=utf-8';
+    // For zipping, you'd need a library like JSZip on the client or handle it server-side
+    // This example assumes single file or pre-zipped content
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -292,7 +294,8 @@ export default function Home() {
 
 
       {/* Card for the form - Increased transparency, blur, and border radius */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-3xl bg-card/5 dark:bg-card/[0.03] border border-border/10 rounded-2xl overflow-hidden"> {/* Increased blur to 3xl, adjusted bg alpha, adjusted border alpha */}
+      {/* Adjusted backdrop blur to 'backdrop-blur-[28px]' which is close to 97% if 30px is 100% */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-[28px] bg-card/5 dark:bg-card/[0.03] border border-border/10 rounded-2xl overflow-hidden">
         <CardContent className="pt-6 px-6 sm:px-8"> {/* Adjusted padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
@@ -314,7 +317,13 @@ export default function Home() {
                             {...field}
                             className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
                           />
-                          <Button type="button" variant="outline" onClick={() => handleBrowse('mappingFile')} className="shrink-0">
+                           {/* Apply semi-transparent background in light mode */}
+                           <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleBrowse('mappingFile')}
+                                className="shrink-0 bg-white/50 dark:bg-transparent"
+                           >
                             <FolderOpen className="mr-2 h-4 w-4" /> Browse
                           </Button>
                           <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('mappingFile')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear mapping file path">
@@ -344,7 +353,13 @@ export default function Home() {
                                 {...field}
                                 className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
                                 />
-                            <Button type="button" variant="outline" onClick={() => handleBrowse('inputFileOrFolder')} className="shrink-0">
+                             {/* Apply semi-transparent background in light mode */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleBrowse('inputFileOrFolder')}
+                                className="shrink-0 bg-white/50 dark:bg-transparent"
+                            >
                                 <FolderOpen className="mr-2 h-4 w-4" /> Browse
                             </Button>
                              <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('inputFileOrFolder')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear input file/folder path">
@@ -397,7 +412,13 @@ export default function Home() {
                               {...field}
                               className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
                             />
-                            <Button type="button" variant="outline" onClick={() => handleBrowse('outputFolder')} className="shrink-0">
+                             {/* Apply semi-transparent background in light mode */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleBrowse('outputFolder')}
+                                className="shrink-0 bg-white/50 dark:bg-transparent"
+                            >
                               <FolderOpen className="mr-2 h-4 w-4" /> Browse
                             </Button>
                             <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('outputFolder')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear output folder path">
@@ -416,7 +437,7 @@ export default function Home() {
                 <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/20"> {/* Adjusted border alpha */}
                      {/* Progress Bar */}
                      {/* Always render Progress container, but control visibility with opacity */}
-                     <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-100' : 'opacity-0 h-0'}`}> {/* Hide container when not loading */}
+                     <div className={`transition-opacity duration-300 ${isLoading || progressValue > 0 ? 'opacity-100 h-auto' : 'opacity-0 h-0'}`}> {/* Make visible if loading or if progress is > 0 */}
                         <div className="flex items-center space-x-2">
                             <Progress value={progressValue} className="w-full h-2 transition-all duration-150 ease-linear" />
                              <span className="text-xs font-mono text-muted-foreground min-w-[40px] text-right">{`${Math.round(progressValue)}%`}</span>
