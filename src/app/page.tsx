@@ -137,7 +137,7 @@ export default function Home() {
     return () => { // Cleanup interval on unmount or when isLoading changes
       if (timer) clearInterval(timer);
     };
-  }, [isLoading]); // Run effect when isLoading changes
+  }, [isLoading, progressValue]); // Added progressValue dependency to handle setting to 100% correctly
 
 
   useEffect(() => {
@@ -167,18 +167,24 @@ export default function Home() {
       }
     }
     fetchPaths();
-  }, [form, toast]); // Dependencies
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- form should only be initialized once
+  }, [toast]); // Removed form from dependency array to prevent potential re-runs
 
   const handleBrowse = async (fieldName: keyof FormValues) => {
     // Placeholder for actual file/folder browsing logic
+    // In a real Electron/Tauri app, you'd use dialog APIs.
+    // In a web app, you'd use <input type="file"> or specific directory APIs.
     const isSingleFile = form.getValues('isSingleFile');
+    const isOutput = fieldName === 'outputFolder';
+    const isMapping = fieldName === 'mappingFile';
+
     let simulatedPath = `/path/to/simulated/`;
-    if (fieldName === 'mappingFile') {
+    if (isMapping) {
         simulatedPath += 'mapping.xlsx';
-    } else if (fieldName === 'inputFileOrFolder') {
+    } else if (isOutput) {
+        simulatedPath += 'output_folder';
+    } else { // inputFileOrFolder
         simulatedPath += isSingleFile ? 'playwright_script.py' : 'playwright_scripts_folder';
-    } else if (fieldName === 'outputFolder') {
-        simulatedPath += 'output_folder'; // This is just for path saving consistency
     }
 
     form.setValue(fieldName, simulatedPath);
@@ -213,7 +219,11 @@ export default function Home() {
       // Call the server action for conversion
       const result = await convertCode(data);
 
-      setProgressValue(100); // Set progress to 100% on completion
+      // Ensure progress reaches 100% even if conversion is instant
+      // Use setTimeout to allow the progress bar to update visually before reaching 100
+      await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
+      setProgressValue(100);
+
 
       if (result.success && result.fileContent && result.fileName) {
         toast({
@@ -230,8 +240,10 @@ export default function Home() {
         });
       }
     } catch (error) {
-        setProgressValue(100); // Also set to 100 on error
         console.error('Conversion process error:', error);
+        // Ensure progress reaches 100 on error as well
+        await new Promise(resolve => setTimeout(resolve, 50));
+        setProgressValue(100);
         let errorMessage = 'An unexpected error occurred during conversion.';
         if (error instanceof Error) {
             errorMessage = error.message;
@@ -243,8 +255,12 @@ export default function Home() {
         });
     } finally {
       setIsLoading(false);
-       // Optional: Reset progress bar after a delay
-       // setTimeout(() => setProgressValue(0), 1000);
+       // Optional: Reset progress bar after a short delay, ensuring it was 100 first
+       setTimeout(() => {
+           if (progressValue === 100) { // Check if it actually reached 100
+                // setProgressValue(0); // Uncomment to hide bar after success/error
+           }
+       }, 1000); // Delay before potentially hiding
     }
   };
 
@@ -276,7 +292,7 @@ export default function Home() {
 
 
       {/* Card for the form - Increased transparency, blur, and border radius */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-xl bg-card/10 dark:bg-card/5 border border-border/20 rounded-2xl overflow-hidden"> {/* Increased transparency, increased radius to 2xl */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-3xl bg-card/5 dark:bg-card/[0.03] border border-border/10 rounded-2xl overflow-hidden"> {/* Increased blur to 3xl, adjusted bg alpha, adjusted border alpha */}
         <CardContent className="pt-6 px-6 sm:px-8"> {/* Adjusted padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
@@ -296,7 +312,7 @@ export default function Home() {
                           <Input
                             placeholder="/path/to/your/mapping.xlsx"
                             {...field}
-                            className="flex-grow bg-background/30 dark:bg-background/20 border-border/40" /* Match card transparency, adjust border */
+                            className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
                           />
                           <Button type="button" variant="outline" onClick={() => handleBrowse('mappingFile')} className="shrink-0">
                             <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -324,9 +340,9 @@ export default function Home() {
                        <FormControl>
                           <div className="flex flex-col sm:flex-row gap-2">
                             <Input
-                                placeholder={form.getValues('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"}
+                                placeholder={form.watch('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"} // Use watch for dynamic placeholder
                                 {...field}
-                                className="flex-grow bg-background/30 dark:bg-background/20 border-border/40" /* Match card transparency, adjust border */
+                                className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
                                 />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('inputFileOrFolder')} className="shrink-0">
                                 <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -346,7 +362,7 @@ export default function Home() {
                     control={form.control}
                     name="isSingleFile"
                     render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/30 p-3 shadow-sm bg-muted/20 dark:bg-muted/10"> {/* Adjusted border and bg transparency */}
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/20 p-3 shadow-sm bg-muted/[0.05] dark:bg-muted/[0.03]"> {/* Adjusted border and bg alpha */}
                             <FormControl>
                                 <Checkbox
                                 checked={field.value}
@@ -379,7 +395,7 @@ export default function Home() {
                             <Input
                               placeholder="/path/to/remember/for/next/time"
                               {...field}
-                              className="flex-grow bg-background/30 dark:bg-background/20 border-border/40" /* Match card transparency, adjust border */
+                              className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
                             />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('outputFolder')} className="shrink-0">
                               <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -397,14 +413,15 @@ export default function Home() {
 
 
                 {/* Progress Bar and Buttons Row */}
-                <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/30"> {/* Adjusted border color */}
+                <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/20"> {/* Adjusted border alpha */}
                      {/* Progress Bar */}
-                     {isLoading && (
+                     {/* Always render Progress container, but control visibility with opacity */}
+                     <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-100' : 'opacity-0 h-0'}`}> {/* Hide container when not loading */}
                         <div className="flex items-center space-x-2">
                             <Progress value={progressValue} className="w-full h-2 transition-all duration-150 ease-linear" />
                              <span className="text-xs font-mono text-muted-foreground min-w-[40px] text-right">{`${Math.round(progressValue)}%`}</span>
                         </div>
-                     )}
+                     </div>
 
                      {/* Convert Button */}
                     <Button type="submit" disabled={isLoading} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105">
@@ -427,3 +444,4 @@ export default function Home() {
     </main>
   );
 }
+
