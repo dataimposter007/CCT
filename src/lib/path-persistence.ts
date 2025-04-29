@@ -1,3 +1,4 @@
+
 'use server'; // Mark this module for server-side execution only
 
 import fs from 'fs/promises';
@@ -7,18 +8,22 @@ import os from 'os';
 interface Paths {
   mappingFile: string;
   inputFileOrFolder: string;
+  isSingleFile?: boolean; // Make optional here as well for flexibility
   outputFolder: string;
 }
 
 // Use a file in the user's home directory for persistence
-// IMPORTANT: This relies on server-side execution environment having access to a writable filesystem.
-// This will work in local development (`next dev`) but might require adjustments for specific deployment platforms.
 const filePath = path.join(os.homedir(), '.playwright_robot_converter_paths.json');
 
 
 export async function savePaths(paths: Paths): Promise<void> {
   try {
-    const data = JSON.stringify(paths, null, 2); // Pretty print JSON
+    // Ensure isSingleFile is explicitly included, defaulting to false if undefined
+    const dataToSave = {
+        ...paths,
+        isSingleFile: paths.isSingleFile ?? false,
+    };
+    const data = JSON.stringify(dataToSave, null, 2); // Pretty print JSON
     await fs.writeFile(filePath, data, 'utf-8');
     console.log('Paths saved successfully to:', filePath);
   } catch (error) {
@@ -36,7 +41,8 @@ export async function loadPaths(): Promise<Paths | null> {
     const data = await fs.readFile(filePath, 'utf-8');
     const paths: Paths = JSON.parse(data);
     console.log('Paths loaded successfully from:', filePath);
-    return paths;
+    // Ensure isSingleFile exists in the loaded object, default if not
+    return { ...paths, isSingleFile: paths.isSingleFile ?? false };
   } catch (error) {
     // It's common for the file not to exist initially, handle this gracefully.
      if (error instanceof Error && error.code === 'ENOENT') {
@@ -51,3 +57,5 @@ export async function loadPaths(): Promise<Paths | null> {
      throw new Error('An unknown error occurred while loading paths.');
   }
 }
+
+      
