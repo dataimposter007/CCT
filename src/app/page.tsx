@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -139,9 +140,10 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-12 relative">
+    // Removed items-center justify-center, adjusted padding
+    <main className="flex min-h-screen flex-col items-center p-4 sm:p-6 relative">
        {/* Theme Toggle Switch */}
-       <div className="absolute top-4 right-4 flex items-center space-x-2">
+       <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
             <Sun className="h-5 w-5" />
             <Switch
                 checked={theme === 'dark'}
@@ -151,12 +153,34 @@ export default function Home() {
             <Moon className="h-5 w-5" />
         </div>
 
-      <Card className="w-full max-w-2xl shadow-lg backdrop-blur-sm bg-card/90 dark:bg-card/80 border border-border/50">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">Playwright to Robot Converter</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Select your files and output location to start the conversion.
-          </CardDescription>
+      <Card className="w-full max-w-2xl shadow-lg backdrop-blur-sm bg-card/90 dark:bg-card/80 border border-border/50 mt-10 sm:mt-16"> {/* Added margin-top */}
+        <CardHeader className="text-center relative">
+           {/* Logo Placeholders */}
+           <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+               <Image
+                 src="https://picsum.photos/40/40?random=1" // Placeholder 1
+                 alt="Logo 1"
+                 width={40}
+                 height={40}
+                 className="rounded-full"
+               />
+           </div>
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+               <Image
+                 src="https://picsum.photos/40/40?random=2" // Placeholder 2
+                 alt="Logo 2"
+                 width={40}
+                 height={40}
+                 className="rounded-full"
+               />
+           </div>
+          {/* Title and Description moved slightly down */}
+          <div className="pt-4">
+              <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">Playwright to Robot Converter</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Select your files and output location to start the conversion.
+              </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -286,3 +310,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
