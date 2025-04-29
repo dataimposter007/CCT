@@ -55,15 +55,16 @@ const MenuBar = () => {
     };
 
     return (
-        <nav className="w-full max-w-4xl mx-auto flex justify-between items-center py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
+        // Removed max-w-4xl and mx-auto to make it full width within its container
+        <nav className="w-full flex justify-between items-center py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
             <div className="flex items-center space-x-4">
                 <Link href="#" passHref>
-                    <Button variant="ghost" className="hover:bg-accent hover:text-accent-foreground px-3 py-1.5 h-auto">
+                    <Button variant="ghost" className="hover:bg-accent/80 hover:text-accent-foreground px-3 py-1.5 h-auto"> {/* Slightly darker hover */}
                         <Info className="mr-2 h-4 w-4" /> About
                     </Button>
                 </Link>
                 <Link href="#" passHref>
-                     <Button variant="ghost" className="hover:bg-accent hover:text-accent-foreground px-3 py-1.5 h-auto">
+                     <Button variant="ghost" className="hover:bg-accent/80 hover:text-accent-foreground px-3 py-1.5 h-auto"> {/* Slightly darker hover */}
                         <Mail className="mr-2 h-4 w-4" /> Contact
                     </Button>
                 </Link>
@@ -205,7 +206,7 @@ export default function Home() {
     // Use padding and flex to arrange elements
     <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 relative">
 
-        {/* Menu Bar */}
+        {/* Menu Bar - Now spans full width */}
         <MenuBar />
 
 
@@ -239,8 +240,8 @@ export default function Home() {
         </div>
 
 
-      {/* Card for the form - Added transparency and blur */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-sm bg-card/80 dark:bg-card/70 border border-border/40 rounded-lg overflow-hidden">
+      {/* Card for the form - Increased transparency and blur */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-md bg-card/60 dark:bg-card/50 border border-border/30 rounded-lg overflow-hidden"> {/* Increased transparency and blur */}
         {/* CardHeader can be removed if Title/Description are outside */}
         {/* <CardHeader className="text-center border-b pb-4 bg-card/90 dark:bg-card/80">
         </CardHeader> */}
@@ -389,5 +390,3 @@ export default function Home() {
     </main>
   );
 }
-
-    
