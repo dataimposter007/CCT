@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Roboto } from 'next/font/google'; // Import Roboto
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
+import { ThemeProvider } from '@/components/theme-provider'; // Import ThemeProvider
 
 const roboto = Roboto({
   weight: ['400', '500', '700'], // Specify weights needed
@@ -20,12 +21,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${roboto.variable} font-sans antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${roboto.variable} antialiased`}>
         {' '}
-        {/* Apply font variable and fallback */}
-        {children}
-        <Toaster /> {/* Add Toaster component here */}
+        {/* Apply font variable and fallback, removed font-sans */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster /> {/* Add Toaster component here */}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,22 +1,24 @@
 'use server';
 
 import type { z } from 'zod';
-import { z as zod } from 'zod'; // Import z from zod
+// import { z as zod } from 'zod'; // Import z from zod - No longer needed as z is imported above
+import * as zod from 'zod'; // Use import * as z
 
 // Define the expected input shape based on the form schema
 // Re-define or import if the schema is in a shared location
-const FormSchema = zod.object({ // Use the imported 'zod' alias
+const FormSchema = zod.object({ // Use the imported 'z' alias
   mappingFile: zod.string().min(1),
   inputFileOrFolder: zod.string().min(1),
   outputFolder: zod.string().min(1),
 });
 
-type FormValues = zod.infer<typeof FormSchema>; // Use the imported 'zod' alias
+type FormValues = zod.infer<typeof FormSchema>; // Use the imported 'z' alias
 
 interface ConversionResult {
   success: boolean;
   message?: string;
   error?: string;
+  outputContent?: string; // Add field to hold simulated output content
 }
 
 // Placeholder for the actual conversion logic
@@ -48,10 +50,39 @@ async function performConversion(data: FormValues): Promise<ConversionResult> {
       return { success: false, error: 'Mapping file must be an .xlsx file.' };
    }
 
+  // Simulate successful output content
+  const simulatedOutput = `*** Settings ***
+Library    SeleniumLibrary
+Documentation    Generated Robot test for ${data.inputFileOrFolder} using ${path.basename(data.mappingFile)}
+
+*** Variables ***
+\${BROWSER}    chrome
+
+*** Test Cases ***
+Simulated Test From Playwright
+    Open Browser    https://example.com    \${BROWSER}
+    Input Text    id=username    myuser
+    Input Password    id=password    mypassword
+    Click Button    id=submit
+    Page Should Contain    Welcome, myuser!
+    [Teardown]    Close Browser
+
+*** Keywords ***
+# Add custom keywords based on Playwright functions if needed
+`;
+
+
   console.log("Conversion simulation successful.");
-  return { success: true, message: `Successfully converted files from ${data.inputFileOrFolder}. Output saved to ${data.outputFolder}.` };
+  return {
+    success: true,
+    message: `Successfully converted files from ${data.inputFileOrFolder}. Output saved to ${data.outputFolder}.`,
+    outputContent: simulatedOutput // Include simulated output
+};
   // --- End Placeholder Logic ---
 }
+
+// Need to import path for basename
+import path from 'path';
 
 export async function convertCode(data: FormValues): Promise<ConversionResult> {
   // Validate input data using the schema
