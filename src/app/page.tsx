@@ -3,13 +3,13 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
-import { useForm, FormProvider, type SubmitHandler } from 'react-hook-form'; // Import FormProvider
+import { useForm, type SubmitHandler } from 'react-hook-form'; // Removed FormProvider import as <Form> handles it
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle, CardDescription
 import { FolderOpen, FileText, ChevronsRight, Sun, Moon, CodeXml, XCircle, Download, Info, Mail } from 'lucide-react'; // Added Info, Mail
 import { useToast } from '@/hooks/use-toast';
 import { savePaths, loadPaths } from '@/lib/path-persistence';
@@ -56,8 +56,14 @@ const MenuBar = () => {
 
     return (
         // Removed max-w-4xl and mx-auto to make it full width within its container
-        <nav className="w-full flex justify-between items-center py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
-            <div className="flex items-center space-x-4">
+        // Added items-baseline for better alignment with the larger NOKIA text
+        <nav className="w-full flex justify-between items-baseline py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
+            <div className="flex items-baseline space-x-4"> {/* Changed items-center to items-baseline */}
+                 {/* NOKIA Brand Text */}
+                 <span className="text-xl font-bold text-primary-foreground dark:text-primary-foreground/90 mr-6"> {/* Adjusted size, weight and margin */}
+                    NOKIA
+                 </span>
+                 {/* End NOKIA Brand Text */}
                 <Link href="#" passHref>
                     <Button variant="ghost" className="hover:bg-accent/80 hover:text-accent-foreground px-3 py-1.5 h-auto"> {/* Slightly darker hover */}
                         <Info className="mr-2 h-4 w-4" /> About
@@ -230,21 +236,16 @@ export default function Home() {
                  className="rounded-full shadow-lg object-cover" // Added object-cover
                />
            </div>
-            {/* Title and Description outside card */}
+            {/* Title outside card */}
            <h1 className="text-3xl sm:text-4xl font-bold text-primary-foreground dark:text-primary-foreground/90 mt-4"> {/* Use h1, adjust color for better contrast */}
                 Playwright to Robot Converter
             </h1>
-            <p className="text-primary-foreground/80 dark:text-primary-foreground/70 mt-2 max-w-xl"> {/* Use p, adjust color */}
-                Select your Playwright Python file(s) and Excel mapping file, choose an output location preference, and convert them to Robot Framework test cases.
-            </p>
+             {/* Description removed from here */}
         </div>
 
 
-      {/* Card for the form - Increased transparency and blur */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-md bg-card/60 dark:bg-card/50 border border-border/30 rounded-lg overflow-hidden"> {/* Increased transparency and blur */}
-        {/* CardHeader can be removed if Title/Description are outside */}
-        {/* <CardHeader className="text-center border-b pb-4 bg-card/90 dark:bg-card/80">
-        </CardHeader> */}
+      {/* Card for the form - Further increased transparency and blur */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-lg bg-card/40 dark:bg-card/30 border border-border/20 rounded-lg overflow-hidden"> {/* Further increased transparency, blur, adjusted border */}
         <CardContent className="pt-6 px-6 sm:px-8"> {/* Adjusted padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
@@ -264,7 +265,7 @@ export default function Home() {
                           <Input
                             placeholder="/path/to/your/mapping.xlsx"
                             {...field}
-                            className="flex-grow bg-background/70 dark:bg-background/60" /* Slight transparency for input */
+                            className="flex-grow bg-background/40 dark:bg-background/30 border-border/50" /* Match card transparency, adjust border */
                           />
                           <Button type="button" variant="outline" onClick={() => handleBrowse('mappingFile')} className="shrink-0">
                             <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -294,7 +295,7 @@ export default function Home() {
                             <Input
                                 placeholder={form.getValues('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"}
                                 {...field}
-                                className="flex-grow bg-background/70 dark:bg-background/60" /* Slight transparency for input */
+                                className="flex-grow bg-background/40 dark:bg-background/30 border-border/50" /* Match card transparency, adjust border */
                                 />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('inputFileOrFolder')} className="shrink-0">
                                 <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -314,7 +315,7 @@ export default function Home() {
                     control={form.control}
                     name="isSingleFile"
                     render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/40 p-3 shadow-sm bg-muted/40 dark:bg-muted/30"> {/* Added border */}
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/30 p-3 shadow-sm bg-muted/30 dark:bg-muted/20"> {/* Adjusted border and bg transparency */}
                             <FormControl>
                                 <Checkbox
                                 checked={field.value}
@@ -347,7 +348,7 @@ export default function Home() {
                             <Input
                               placeholder="/path/to/remember/for/next/time"
                               {...field}
-                              className="flex-grow bg-background/70 dark:bg-background/60" /* Slight transparency for input */
+                              className="flex-grow bg-background/40 dark:bg-background/30 border-border/50" /* Match card transparency, adjust border */
                             />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('outputFolder')} className="shrink-0">
                               <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -365,7 +366,7 @@ export default function Home() {
 
 
                 {/* Buttons Row */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-6 border-border/40"> {/* Adjusted border color */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-6 border-border/30"> {/* Adjusted border color */}
                     {/* Convert Button - Now triggers download */}
                     <Button type="submit" disabled={isLoading} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105">
                     {isLoading ? (
