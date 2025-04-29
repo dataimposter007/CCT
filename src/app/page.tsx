@@ -10,7 +10,7 @@ import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle, CardDescription
-import { FolderOpen, FileText, ChevronsRight, Sun, Moon, CodeXml, XCircle, Download, Info, Mail } from 'lucide-react'; // Added Info, Mail
+import { FolderOpen, FileText, ChevronsRight, Sun, Moon, CodeXml, XCircle, Download, Info, Mail, Loader2 } from 'lucide-react'; // Added Info, Mail, Loader2
 import { useToast } from '@/hooks/use-toast';
 import { savePaths, loadPaths } from '@/lib/path-persistence';
 import { convertCode } from './actions'; // Import server action
@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import Link from 'next/link'; // Import Link for menu items
+import { Progress } from "@/components/ui/progress"; // Import Progress component
 
 
 // Define Zod schema for form validation
@@ -92,6 +93,7 @@ const MenuBar = () => {
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
+  const [progressValue, setProgressValue] = useState(0); // State for progress bar
   const { toast } = useToast();
 
 
@@ -104,6 +106,39 @@ export default function Home() {
       outputFolder: '',
     },
   });
+
+  // Effect to simulate progress increase during loading
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (isLoading) {
+      setProgressValue(10); // Start progress immediately
+      timer = setInterval(() => {
+        setProgressValue((prev) => {
+          if (prev >= 95) { // Simulate stalling near the end
+             if (timer) clearInterval(timer);
+             return 95;
+          }
+          return prev + 5; // Increment progress
+        });
+      }, 150); // Adjust interval for desired speed (matches simulated delay)
+    } else {
+      // If loading finishes quickly or is cancelled, ensure progress reaches 100
+       if (progressValue > 0 && progressValue < 100) {
+           setProgressValue(100);
+           // Optional: Hide progress bar after a short delay
+           // setTimeout(() => setProgressValue(0), 500);
+       } else if (progressValue === 100) {
+          // Optional: Hide progress bar after a short delay
+         // setTimeout(() => setProgressValue(0), 500);
+       }
+       // else progress is 0, do nothing
+    }
+
+    return () => { // Cleanup interval on unmount or when isLoading changes
+      if (timer) clearInterval(timer);
+    };
+  }, [isLoading]); // Run effect when isLoading changes
+
 
   useEffect(() => {
     // Load paths from JSON file on component mount
@@ -165,6 +200,7 @@ export default function Home() {
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
     setIsLoading(true);
+    setProgressValue(0); // Reset progress on new submission
     console.log("Form submitted with data:", data);
     try {
       // Save paths before starting conversion
@@ -176,6 +212,8 @@ export default function Home() {
 
       // Call the server action for conversion
       const result = await convertCode(data);
+
+      setProgressValue(100); // Set progress to 100% on completion
 
       if (result.success && result.fileContent && result.fileName) {
         toast({
@@ -192,6 +230,7 @@ export default function Home() {
         });
       }
     } catch (error) {
+        setProgressValue(100); // Also set to 100 on error
         console.error('Conversion process error:', error);
         let errorMessage = 'An unexpected error occurred during conversion.';
         if (error instanceof Error) {
@@ -204,6 +243,8 @@ export default function Home() {
         });
     } finally {
       setIsLoading(false);
+       // Optional: Reset progress bar after a delay
+       // setTimeout(() => setProgressValue(0), 1000);
     }
   };
 
@@ -234,8 +275,8 @@ export default function Home() {
         </div>
 
 
-      {/* Card for the form - Increased transparency and blur */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-xl bg-card/20 dark:bg-card/10 border border-border/20 rounded-lg overflow-hidden"> {/* Increased transparency and blur, adjusted border */}
+      {/* Card for the form - Increased transparency, blur, and border radius */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-xl bg-card/10 dark:bg-card/5 border border-border/20 rounded-2xl overflow-hidden"> {/* Increased transparency, increased radius to 2xl */}
         <CardContent className="pt-6 px-6 sm:px-8"> {/* Adjusted padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
@@ -355,23 +396,28 @@ export default function Home() {
                 />
 
 
-                {/* Buttons Row */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-6 border-border/30"> {/* Adjusted border color */}
-                    {/* Convert Button - Now triggers download */}
+                {/* Progress Bar and Buttons Row */}
+                <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/30"> {/* Adjusted border color */}
+                     {/* Progress Bar */}
+                     {isLoading && (
+                        <div className="flex items-center space-x-2">
+                            <Progress value={progressValue} className="w-full h-2 transition-all duration-150 ease-linear" />
+                             <span className="text-xs font-mono text-muted-foreground min-w-[40px] text-right">{`${Math.round(progressValue)}%`}</span>
+                        </div>
+                     )}
+
+                     {/* Convert Button */}
                     <Button type="submit" disabled={isLoading} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105">
-                    {isLoading ? (
+                        {isLoading ? (
                         <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Converting...
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {/* Use Loader2 for a standard spinner */}
+                            Converting...
                         </>
-                    ) : (
+                        ) : (
                         <>
-                        <Download className="mr-2 h-5 w-5" /> Convert & Download
+                            <Download className="mr-2 h-5 w-5" /> Convert & Download
                         </>
-                    )}
+                        )}
                     </Button>
                 </div>
             </form>
@@ -381,5 +427,3 @@ export default function Home() {
     </main>
   );
 }
-
-    
