@@ -97,6 +97,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [progressValue, setProgressValue] = useState(0); // State for progress bar
   const { toast } = useToast();
+  const { theme } = useTheme(); // Get current theme
 
 
   const form = useForm<FormValues>({
@@ -280,11 +281,12 @@ export default function Home() {
            {/* Single Logo Placeholder - Centered and Enlarged */}
            <div className="flex justify-center items-center mb-4">
                <Image
-                 src="https://picsum.photos/240/240?random=1" // Tripled size (80*3)
-                 alt="Playwright Logo"
+                 src={theme === 'light' ? "https://storage.googleapis.com/aai-web-samples/code-converter-logo-light.png" : "https://picsum.photos/240/240?random=1"} // Conditional logo based on theme
+                 alt="Code Converter Logo"
                  width={240} // Tripled size
                  height={240} // Tripled size
-                 className="rounded-full shadow-lg object-cover" // Added object-cover
+                 className="rounded-lg shadow-lg object-contain" // Changed to rounded-lg and object-contain
+                 priority // Prioritize loading the logo
                />
                 {/* Removed ChevronsRight and second logo */}
            </div>

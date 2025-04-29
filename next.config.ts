@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -13,6 +14,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
+       { // Added rule for Google Cloud Storage images
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
         port: '',
         pathname: '/**',
       },
