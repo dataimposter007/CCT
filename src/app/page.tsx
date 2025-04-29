@@ -60,7 +60,7 @@ const MenuBar = () => {
         <nav className="w-full flex justify-between items-baseline py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
             <div className="flex items-baseline space-x-4"> {/* Changed items-center to items-baseline */}
                  {/* NOKIA Brand Text */}
-                 <span className="text-xl font-bold text-primary-foreground dark:text-primary-foreground/90 mr-6"> {/* Adjusted size, weight and margin */}
+                 <span className="text-3xl font-extrabold text-primary-foreground dark:text-primary-foreground/90 mr-6"> {/* Increased size, weight and margin */}
                     NOKIA
                  </span>
                  {/* End NOKIA Brand Text */}
@@ -216,36 +216,26 @@ export default function Home() {
         <MenuBar />
 
 
-       {/* Logos and Title - Positioned above the card */}
+       {/* Logo and Title - Positioned above the card */}
        <div className="flex flex-col items-center mb-6 text-center">
-           {/* Logo Placeholders - Increased Size */}
-           <div className="flex justify-center items-center space-x-8 mb-4">
+           {/* Single Logo Placeholder - Centered and Enlarged */}
+           <div className="flex justify-center items-center mb-4">
                <Image
-                 src="https://picsum.photos/80/80?random=1" // Increased size
+                 src="https://picsum.photos/240/240?random=1" // Tripled size (80*3)
                  alt="Playwright Logo"
-                 width={80} // Increased size
-                 height={80} // Increased size
+                 width={240} // Tripled size
+                 height={240} // Tripled size
                  className="rounded-full shadow-lg object-cover" // Added object-cover
                />
-                <ChevronsRight className="h-10 w-10 text-primary dark:text-primary-foreground/80" />
-               <Image
-                 src="https://picsum.photos/80/80?random=2" // Increased size
-                 alt="Robot Framework Logo"
-                 width={80} // Increased size
-                 height={80} // Increased size
-                 className="rounded-full shadow-lg object-cover" // Added object-cover
-               />
+                {/* Removed ChevronsRight and second logo */}
            </div>
-            {/* Title outside card */}
-           <h1 className="text-3xl sm:text-4xl font-bold text-primary-foreground dark:text-primary-foreground/90 mt-4"> {/* Use h1, adjust color for better contrast */}
-                Playwright to Robot Converter
-            </h1>
+            {/* Title removed */}
              {/* Description removed from here */}
         </div>
 
 
-      {/* Card for the form - Further increased transparency and blur */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-lg bg-card/40 dark:bg-card/30 border border-border/20 rounded-lg overflow-hidden"> {/* Further increased transparency, blur, adjusted border */}
+      {/* Card for the form - Increased transparency and blur */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-xl bg-card/20 dark:bg-card/10 border border-border/20 rounded-lg overflow-hidden"> {/* Increased transparency and blur, adjusted border */}
         <CardContent className="pt-6 px-6 sm:px-8"> {/* Adjusted padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
@@ -265,7 +255,7 @@ export default function Home() {
                           <Input
                             placeholder="/path/to/your/mapping.xlsx"
                             {...field}
-                            className="flex-grow bg-background/40 dark:bg-background/30 border-border/50" /* Match card transparency, adjust border */
+                            className="flex-grow bg-background/30 dark:bg-background/20 border-border/40" /* Match card transparency, adjust border */
                           />
                           <Button type="button" variant="outline" onClick={() => handleBrowse('mappingFile')} className="shrink-0">
                             <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -295,7 +285,7 @@ export default function Home() {
                             <Input
                                 placeholder={form.getValues('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"}
                                 {...field}
-                                className="flex-grow bg-background/40 dark:bg-background/30 border-border/50" /* Match card transparency, adjust border */
+                                className="flex-grow bg-background/30 dark:bg-background/20 border-border/40" /* Match card transparency, adjust border */
                                 />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('inputFileOrFolder')} className="shrink-0">
                                 <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -315,7 +305,7 @@ export default function Home() {
                     control={form.control}
                     name="isSingleFile"
                     render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/30 p-3 shadow-sm bg-muted/30 dark:bg-muted/20"> {/* Adjusted border and bg transparency */}
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/30 p-3 shadow-sm bg-muted/20 dark:bg-muted/10"> {/* Adjusted border and bg transparency */}
                             <FormControl>
                                 <Checkbox
                                 checked={field.value}
@@ -348,7 +338,7 @@ export default function Home() {
                             <Input
                               placeholder="/path/to/remember/for/next/time"
                               {...field}
-                              className="flex-grow bg-background/40 dark:bg-background/30 border-border/50" /* Match card transparency, adjust border */
+                              className="flex-grow bg-background/30 dark:bg-background/20 border-border/40" /* Match card transparency, adjust border */
                             />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('outputFolder')} className="shrink-0">
                               <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -391,3 +381,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
