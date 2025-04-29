@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm, FormProvider, type SubmitHandler } from 'react-hook-form'; // Import FormProvider
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image'; // Import next/image
@@ -230,17 +230,17 @@ export default function Home() {
                />
            </div>
             {/* Title and Description outside card */}
-           <h1 className="text-3xl sm:text-4xl font-bold text-primary dark:text-primary-foreground/90 mt-4"> {/* Use h1 */}
+           <h1 className="text-3xl sm:text-4xl font-bold text-primary-foreground dark:text-primary-foreground/90 mt-4"> {/* Use h1, adjust color for better contrast */}
                 Playwright to Robot Converter
             </h1>
-            <p className="text-muted-foreground mt-2 max-w-xl"> {/* Use p */}
+            <p className="text-primary-foreground/80 dark:text-primary-foreground/70 mt-2 max-w-xl"> {/* Use p, adjust color */}
                 Select your Playwright Python file(s) and Excel mapping file, choose an output location preference, and convert them to Robot Framework test cases.
             </p>
         </div>
 
 
-      {/* Card for the form */}
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-sm bg-card/80 dark:bg-card/70 border border-border/40 rounded-lg overflow-hidden"> {/* Slightly smaller max-width */}
+      {/* Card for the form - Added transparency and blur */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-sm bg-card/80 dark:bg-card/70 border border-border/40 rounded-lg overflow-hidden">
         {/* CardHeader can be removed if Title/Description are outside */}
         {/* <CardHeader className="text-center border-b pb-4 bg-card/90 dark:bg-card/80">
         </CardHeader> */}
@@ -263,7 +263,7 @@ export default function Home() {
                           <Input
                             placeholder="/path/to/your/mapping.xlsx"
                             {...field}
-                            className="flex-grow bg-background/70 dark:bg-background/60"
+                            className="flex-grow bg-background/70 dark:bg-background/60" /* Slight transparency for input */
                           />
                           <Button type="button" variant="outline" onClick={() => handleBrowse('mappingFile')} className="shrink-0">
                             <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -293,7 +293,7 @@ export default function Home() {
                             <Input
                                 placeholder={form.getValues('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"}
                                 {...field}
-                                className="flex-grow bg-background/70 dark:bg-background/60"
+                                className="flex-grow bg-background/70 dark:bg-background/60" /* Slight transparency for input */
                                 />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('inputFileOrFolder')} className="shrink-0">
                                 <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -313,7 +313,7 @@ export default function Home() {
                     control={form.control}
                     name="isSingleFile"
                     render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/40 dark:bg-muted/30">
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/40 p-3 shadow-sm bg-muted/40 dark:bg-muted/30"> {/* Added border */}
                             <FormControl>
                                 <Checkbox
                                 checked={field.value}
@@ -346,7 +346,7 @@ export default function Home() {
                             <Input
                               placeholder="/path/to/remember/for/next/time"
                               {...field}
-                              className="flex-grow bg-background/70 dark:bg-background/60"
+                              className="flex-grow bg-background/70 dark:bg-background/60" /* Slight transparency for input */
                             />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('outputFolder')} className="shrink-0">
                               <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -364,7 +364,7 @@ export default function Home() {
 
 
                 {/* Buttons Row */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-6 border-border/40"> {/* Reduced pt/mt */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-6 border-border/40"> {/* Adjusted border color */}
                     {/* Convert Button - Now triggers download */}
                     <Button type="submit" disabled={isLoading} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105">
                     {isLoading ? (
@@ -389,3 +389,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
