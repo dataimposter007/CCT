@@ -3,21 +3,21 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
-import { useForm, type SubmitHandler, FormProvider } from 'react-hook-form'; // Import FormProvider
+import { useForm, type SubmitHandler } from 'react-hook-form'; // Removed FormProvider import
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { FolderOpen, FileText, ChevronsRight, Sun, Moon, Eye, CodeXml, XCircle } from 'lucide-react';
+// Removed Dialog imports as they are no longer needed
+import { FolderOpen, FileText, ChevronsRight, Sun, Moon, CodeXml, XCircle, Download } from 'lucide-react'; // Added Download, removed Eye
 import { useToast } from '@/hooks/use-toast';
 import { savePaths, loadPaths } from '@/lib/path-persistence';
 import { convertCode } from './actions'; // Import server action
 import { useTheme } from 'next-themes';
 import { Switch } from '@/components/ui/switch';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Removed ScrollArea import as it's no longer needed
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
@@ -27,16 +27,27 @@ const FormSchema = z.object({
   mappingFile: z.string().min(1, 'Mapping file path is required.'),
   inputFileOrFolder: z.string().min(1, 'Input file/folder path is required.'),
   isSingleFile: z.boolean().default(false).optional(), // Added checkbox state
-  outputFolder: z.string().min(1, 'Output folder path is required.'),
+  outputFolder: z.string().min(1, 'Output folder path is required.'), // Keep for saving path
 });
 
 type FormValues = z.infer<typeof FormSchema>;
 
+// Helper function to trigger download
+function downloadFile(filename: string, content: string) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url); // Clean up the object URL
+}
+
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
-  const [viewContent, setViewContent] = useState<string | null>(null);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [conversionSuccess, setConversionSuccess] = useState(false); // Track conversion success
+  // Removed state related to view modal: viewContent, isViewModalOpen, conversionSuccess
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
 
@@ -81,10 +92,6 @@ export default function Home() {
 
   const handleBrowse = async (fieldName: keyof FormValues) => {
     // Placeholder for actual file/folder browsing logic
-    // In a real Electron or Tauri app, you'd use their APIs here.
-    // For a web app, you might use <input type="file"> or a library.
-    // Since we can't access the local file system directly from a standard web app,
-    // we'll simulate path selection.
     const isSingleFile = form.getValues('isSingleFile');
     let simulatedPath = `/path/to/simulated/`;
     if (fieldName === 'mappingFile') {
@@ -92,7 +99,7 @@ export default function Home() {
     } else if (fieldName === 'inputFileOrFolder') {
         simulatedPath += isSingleFile ? 'playwright_script.py' : 'playwright_scripts_folder';
     } else if (fieldName === 'outputFolder') {
-        simulatedPath += 'output_folder';
+        simulatedPath += 'output_folder'; // This is just for path saving consistency
     }
 
     form.setValue(fieldName, simulatedPath);
@@ -114,9 +121,7 @@ export default function Home() {
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
     setIsLoading(true);
-    setConversionSuccess(false); // Reset success state
-    setViewContent(null); // Reset view content
-    console.log("Form submitted with data:", data); // Log form data including checkbox state
+    console.log("Form submitted with data:", data);
     try {
       // Save paths before starting conversion
       await savePaths(data);
@@ -128,18 +133,17 @@ export default function Home() {
       // Call the server action for conversion
       const result = await convertCode(data);
 
-      if (result.success) {
+      if (result.success && result.fileContent && result.fileName) {
         toast({
           title: 'Conversion Successful',
-          description: result.message,
+          description: `${result.message || 'Starting download...'}`,
         });
-        // Store simulated content for viewing
-        setViewContent(result.outputContent || '*** Settings ***\nLibrary    SeleniumLibrary\n\n*** Test Cases ***\nSimulated Test Case\n    Log    Conversion successful!\n    No Operation\n');
-        setConversionSuccess(true); // Mark conversion as successful
+        // Trigger the download using the helper function
+        downloadFile(result.fileName, result.fileContent);
       } else {
         toast({
           title: 'Conversion Failed',
-          description: result.error || 'An unknown error occurred.',
+          description: result.error || 'An unknown error occurred. Could not generate file.',
           variant: 'destructive',
         });
       }
@@ -201,14 +205,13 @@ export default function Home() {
           <div>
               <CardTitle className="text-3xl sm:text-4xl font-bold text-primary dark:text-primary-foreground/90">Playwright to Robot Converter</CardTitle> {/* Adjusted dark mode text color */}
               <CardDescription className="text-muted-foreground mt-2"> {/* Increased mt */}
-                Select your files and output location to start the conversion.
+                Select your files and output location to start the conversion and download the .robot file.
               </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="pt-8 px-6 sm:px-8"> {/* Increased padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
-             {/* Removed FormProvider duplicate wrap */}
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {/* Mapping File Input */}
                 <FormField
@@ -293,7 +296,7 @@ export default function Home() {
                     />
 
 
-                {/* Output Folder Input */}
+                {/* Output Folder Input - Still useful for saving the preference */}
                  <FormField
                   control={form.control}
                   name="outputFolder"
@@ -301,12 +304,12 @@ export default function Home() {
                     <FormItem>
                       <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80"> {/* Adjusted text color */}
                         <FolderOpen className="h-5 w-5 text-primary" />
-                        Output Robot File Folder
+                        Output Location Preference (for saving path only)
                       </FormLabel>
                       <FormControl>
                          <div className="flex flex-col sm:flex-row gap-2">
                             <Input
-                              placeholder="/path/to/output/robot_files"
+                              placeholder="/path/to/remember/for/next/time"
                               {...field}
                               className="flex-grow bg-background/70 dark:bg-background/60" /* Added slight background */
                             />
@@ -326,8 +329,8 @@ export default function Home() {
 
                 {/* Buttons Row */}
                 <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-8 border-border/40"> {/* Increased pt, Adjusted border transparency */}
-                    {/* Convert Button */}
-                    <Button type="submit" disabled={isLoading} className="flex-grow text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105"> {/* Added hover effect */}
+                    {/* Convert Button - Now triggers download */}
+                    <Button type="submit" disabled={isLoading} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105"> {/* Made full width, added hover effect */}
                     {isLoading ? (
                         <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -338,43 +341,12 @@ export default function Home() {
                         </>
                     ) : (
                         <>
-                        <ChevronsRight className="mr-2 h-5 w-5" /> Convert
+                        <Download className="mr-2 h-5 w-5" /> Convert & Download
                         </>
                     )}
                     </Button>
 
-                    {/* View Output Button - Enabled only after successful conversion */}
-                    <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-                        <DialogTrigger asChild>
-                            <Button
-                            type="button"
-                            variant="secondary"
-                            disabled={!conversionSuccess || isLoading}
-                            className="flex-grow text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105" // Added hover effect
-                            onClick={() => setIsViewModalOpen(true)} // Explicitly open dialog
-                            >
-                            <Eye className="mr-2 h-5 w-5" /> View Output
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[80vw] md:max-w-[70vw] lg:max-w-[60vw] max-h-[85vh] flex flex-col bg-card/95 dark:bg-card/90 rounded-lg"> {/* Adjusted background and rounded */}
-                            <DialogHeader>
-                            <DialogTitle>Simulated Output (.robot)</DialogTitle>
-                            <DialogDescription>
-                                This is a preview of the generated Robot Framework file content.
-                            </DialogDescription>
-                            </DialogHeader>
-                            <ScrollArea className="flex-grow border rounded-md p-4 my-4 bg-muted/50 dark:bg-muted/40"> {/* Adjusted background */}
-                                <pre className="text-sm whitespace-pre-wrap text-muted-foreground">{viewContent || 'No output generated yet.'}</pre>
-                            </ScrollArea>
-                            <DialogFooter>
-                                <DialogClose asChild>
-                                    <Button type="button" variant="secondary">
-                                    Close
-                                    </Button>
-                                </DialogClose>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                    {/* Removed the View Output button and Dialog */}
                 </div>
             </form>
           </Form>

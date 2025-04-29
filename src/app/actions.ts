@@ -11,7 +11,7 @@ const FormSchema = zod.object({
   mappingFile: zod.string().min(1),
   inputFileOrFolder: zod.string().min(1),
   isSingleFile: zod.boolean().default(false).optional(), // Added checkbox state
-  outputFolder: zod.string().min(1),
+  outputFolder: zod.string().min(1), // Keep outputFolder for path saving, even if not used for direct writing here
 });
 
 // Make isSingleFile optional in the type used by the action, though the schema provides a default
@@ -21,9 +21,10 @@ type FormValues = Omit<zod.infer<typeof FormSchema>, 'isSingleFile'> & { isSingl
 
 interface ConversionResult {
   success: boolean;
-  message?: string;
+  message?: string; // Message for toast notifications
   error?: string;
-  outputContent?: string; // Add field to hold simulated output content
+  fileName?: string; // Suggested filename for download
+  fileContent?: string; // Actual content to be downloaded
 }
 
 // Placeholder for the actual conversion logic
@@ -33,15 +34,12 @@ async function performConversion(data: FormValues): Promise<ConversionResult> {
 
   // --- Placeholder Logic ---
   // In a real application, this function would:
-  // 1. Read the mapping file (e.g., using an Excel parsing library like 'xlsx').
+  // 1. Read the mapping file.
   // 2. Read the Playwright Python file(s).
-  //    - If data.isSingleFile is true, read the single file directly.
-  //    - If data.isSingleFile is false (or undefined), recursively find all Python files in the folder.
-  // 3. Parse the Python code (e.g., using AST - Abstract Syntax Trees).
-  // 4. Apply the mapping rules to translate Playwright commands/structures to Robot Framework syntax.
+  // 3. Parse the Python code.
+  // 4. Apply mapping rules.
   // 5. Generate the .robot file content.
-  // 6. Write the generated content to the specified output folder (potentially creating subfolders if needed).
-  // 7. Handle potential errors during file reading, parsing, or writing.
+  // 6. Handle errors.
 
   // Simulate a successful conversion after a delay
   await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate work
@@ -58,14 +56,16 @@ async function performConversion(data: FormValues): Promise<ConversionResult> {
    }
 
   // Simulate successful output content
-  const inputSourceName = path.basename(data.inputFileOrFolder);
+  const inputSourceName = path.basename(data.inputFileOrFolder).replace(/\.[^/.]+$/, ""); // Remove extension
   const mappingFileName = path.basename(data.mappingFile);
   const conversionType = data.isSingleFile ? 'file' : 'folder';
+  const outputFileName = `${inputSourceName}_converted.robot`; // Generate a filename
 
   const simulatedOutput = `*** Settings ***
 Library    SeleniumLibrary
 Documentation    Generated Robot test for ${conversionType} "${inputSourceName}"
 ...              using mapping "${mappingFileName}"
+...              Output saved to: ${data.outputFolder} (Note: Path saved, file downloaded)
 
 *** Variables ***
 \${BROWSER}    chrome
@@ -91,11 +91,12 @@ Simulated Test Case from ${inputSourceName}
 `;
 
 
-  console.log("Conversion simulation successful.");
+  console.log("Conversion simulation successful. Preparing download.");
   return {
     success: true,
-    message: `Successfully converted ${conversionType} ${inputSourceName}. Output saved to ${data.outputFolder}.`,
-    outputContent: simulatedOutput // Include simulated output
+    message: `Successfully converted ${conversionType} ${inputSourceName}. Output file is ready for download.`,
+    fileName: outputFileName, // Suggest filename for download
+    fileContent: simulatedOutput // Include content for download
 };
   // --- End Placeholder Logic ---
 }
@@ -126,5 +127,3 @@ export async function convertCode(rawData: unknown): Promise<ConversionResult> {
       return { success: false, error: errorMessage };
     }
 }
-
-      
