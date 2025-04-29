@@ -23,14 +23,15 @@ interface ConversionResult {
   success: boolean;
   message?: string; // Message for toast notifications
   error?: string;
-  fileName?: string; // Suggested filename for download
-  fileContent?: string; // Actual content to be downloaded
+  fileName?: string; // Suggested filename for download (.robot or .zip)
+  fileContent?: string; // Actual content to be downloaded (single .robot content for now)
 }
 
 // Placeholder for the actual conversion logic
 async function performConversion(data: FormValues): Promise<ConversionResult> {
   console.log("Starting conversion with data:", data);
-  console.log("Input type:", data.isSingleFile ? "Single File" : "Folder");
+  const isSingleFile = data.isSingleFile ?? false; // Default to false if undefined
+  console.log("Input type:", isSingleFile ? "Single File" : "Folder");
 
   // --- Placeholder Logic ---
   // In a real application, this function would:
@@ -38,8 +39,9 @@ async function performConversion(data: FormValues): Promise<ConversionResult> {
   // 2. Read the Playwright Python file(s).
   // 3. Parse the Python code.
   // 4. Apply mapping rules.
-  // 5. Generate the .robot file content.
-  // 6. Handle errors.
+  // 5. Generate the .robot file content(s).
+  // 6. If multiple files, create a zip archive containing them.
+  // 7. Handle errors.
 
   // Simulate a successful conversion after a delay
   await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate work
@@ -55,17 +57,29 @@ async function performConversion(data: FormValues): Promise<ConversionResult> {
       return { success: false, error: 'Mapping file must be an .xlsx file.' };
    }
 
-  // Simulate successful output content
+  // Simulate successful output content (still single file content for simplicity)
   const inputSourceName = path.basename(data.inputFileOrFolder).replace(/\.[^/.]+$/, ""); // Remove extension
   const mappingFileName = path.basename(data.mappingFile);
-  const conversionType = data.isSingleFile ? 'file' : 'folder';
-  const outputFileName = `${inputSourceName}_converted.robot`; // Generate a filename
+  const conversionType = isSingleFile ? 'file' : 'folder';
 
+  // Determine output filename based on whether it's a single file or folder
+  const outputFileName = isSingleFile
+      ? `${inputSourceName}_converted.robot`
+      : `${inputSourceName}_converted_robot_files.zip`; // Suggest .zip for folders
+
+  // Generate success message based on output type
+  const successMessage = isSingleFile
+      ? `Successfully converted file ${inputSourceName}. Output file is ready for download.`
+      : `Successfully converted folder ${inputSourceName}. Output zip archive is ready for download.`;
+
+
+  // The content remains the same simulated single .robot file for now.
+  // Real implementation would generate multiple files and zip them for folder input.
   const simulatedOutput = `*** Settings ***
 Library    SeleniumLibrary
 Documentation    Generated Robot test for ${conversionType} "${inputSourceName}"
 ...              using mapping "${mappingFileName}"
-...              Output saved to: ${data.outputFolder} (Note: Path saved, file downloaded)
+...              Output saved to: ${data.outputFolder} (Note: Path saved, file downloaded as ${outputFileName})
 
 *** Variables ***
 \${BROWSER}    chrome
@@ -91,12 +105,12 @@ Simulated Test Case from ${inputSourceName}
 `;
 
 
-  console.log("Conversion simulation successful. Preparing download.");
+  console.log(`Conversion simulation successful. Preparing download for ${outputFileName}.`);
   return {
     success: true,
-    message: `Successfully converted ${conversionType} ${inputSourceName}. Output file is ready for download.`,
-    fileName: outputFileName, // Suggest filename for download
-    fileContent: simulatedOutput // Include content for download
+    message: successMessage,
+    fileName: outputFileName, // Suggest .robot or .zip filename for download
+    fileContent: simulatedOutput // Include single file content for download (actual zip logic needed for folders)
 };
   // --- End Placeholder Logic ---
 }

@@ -3,23 +3,22 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form'; // Removed FormProvider import
+import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-// Removed Dialog imports as they are no longer needed
-import { FolderOpen, FileText, ChevronsRight, Sun, Moon, CodeXml, XCircle, Download } from 'lucide-react'; // Added Download, removed Eye
+import { FolderOpen, FileText, ChevronsRight, Sun, Moon, CodeXml, XCircle, Download, Info, Mail } from 'lucide-react'; // Added Info, Mail
 import { useToast } from '@/hooks/use-toast';
 import { savePaths, loadPaths } from '@/lib/path-persistence';
 import { convertCode } from './actions'; // Import server action
 import { useTheme } from 'next-themes';
 import { Switch } from '@/components/ui/switch';
-// Removed ScrollArea import as it's no longer needed
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import Link from 'next/link'; // Import Link for menu items
 
 
 // Define Zod schema for form validation
@@ -34,7 +33,9 @@ type FormValues = z.infer<typeof FormSchema>;
 
 // Helper function to trigger download
 function downloadFile(filename: string, content: string) {
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    // Determine MIME type based on filename extension
+    const mimeType = filename.endsWith('.zip') ? 'application/zip' : 'text/plain;charset=utf-8';
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -45,11 +46,47 @@ function downloadFile(filename: string, content: string) {
     URL.revokeObjectURL(url); // Clean up the object URL
 }
 
+
+// Simple Menu Bar Component
+const MenuBar = () => {
+    const { theme, setTheme } = useTheme();
+    const toggleTheme = () => {
+        setTheme(theme === 'light' ? 'dark' : 'light');
+    };
+
+    return (
+        <nav className="w-full max-w-4xl mx-auto flex justify-between items-center py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
+            <div className="flex items-center space-x-4">
+                <Link href="#" passHref>
+                    <Button variant="ghost" className="hover:bg-accent hover:text-accent-foreground px-3 py-1.5 h-auto">
+                        <Info className="mr-2 h-4 w-4" /> About
+                    </Button>
+                </Link>
+                <Link href="#" passHref>
+                     <Button variant="ghost" className="hover:bg-accent hover:text-accent-foreground px-3 py-1.5 h-auto">
+                        <Mail className="mr-2 h-4 w-4" /> Contact
+                    </Button>
+                </Link>
+            </div>
+            <div className="flex items-center space-x-2">
+                <Sun className="h-5 w-5 text-muted-foreground" />
+                <Switch
+                    checked={theme === 'dark'}
+                    onCheckedChange={toggleTheme}
+                    aria-label="Toggle dark mode"
+                    id="theme-switch-nav"
+                />
+                <Moon className="h-5 w-5 text-muted-foreground" />
+            </div>
+        </nav>
+    );
+};
+
+
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
-  // Removed state related to view modal: viewContent, isViewModalOpen, conversionSuccess
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
@@ -163,53 +200,51 @@ export default function Home() {
     }
   };
 
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
-  };
 
   return (
-    // Use padding to create space around the central card instead of centering flex items
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 relative">
-       {/* Theme Toggle Switch - Positioned top right */}
-       <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
-            <Sun className="h-5 w-5" />
-            <Switch
-                checked={theme === 'dark'}
-                onCheckedChange={toggleTheme}
-                aria-label="Toggle dark mode"
-            />
-            <Moon className="h-5 w-5" />
-        </div>
+    // Use padding and flex to arrange elements
+    <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 relative">
 
-      {/* Card with increased max-width and slightly transparent background */}
-      <Card className="w-full max-w-3xl shadow-xl backdrop-blur-sm bg-card/80 dark:bg-card/70 border border-border/40 rounded-lg overflow-hidden"> {/* Adjusted max-width, transparency, border, rounded, overflow */}
-        <CardHeader className="text-center border-b pb-6 bg-card/90 dark:bg-card/80"> {/* Slightly less transparent header */}
+        {/* Menu Bar */}
+        <MenuBar />
+
+
+       {/* Logos and Title - Positioned above the card */}
+       <div className="flex flex-col items-center mb-6 text-center">
            {/* Logo Placeholders - Increased Size */}
-           <div className="flex justify-center items-center space-x-8 mb-6"> {/* Increased space-x and mb */}
+           <div className="flex justify-center items-center space-x-8 mb-4">
                <Image
                  src="https://picsum.photos/80/80?random=1" // Increased size
-                 alt="Logo 1"
+                 alt="Playwright Logo"
                  width={80} // Increased size
                  height={80} // Increased size
-                 className="rounded-full shadow-lg" // Increased shadow
+                 className="rounded-full shadow-lg object-cover" // Added object-cover
                />
+                <ChevronsRight className="h-10 w-10 text-primary dark:text-primary-foreground/80" />
                <Image
                  src="https://picsum.photos/80/80?random=2" // Increased size
-                 alt="Logo 2"
+                 alt="Robot Framework Logo"
                  width={80} // Increased size
                  height={80} // Increased size
-                 className="rounded-full shadow-lg" // Increased shadow
+                 className="rounded-full shadow-lg object-cover" // Added object-cover
                />
            </div>
-          {/* Title and Description */}
-          <div>
-              <CardTitle className="text-3xl sm:text-4xl font-bold text-primary dark:text-primary-foreground/90">Playwright to Robot Converter</CardTitle> {/* Adjusted dark mode text color */}
-              <CardDescription className="text-muted-foreground mt-2"> {/* Increased mt */}
-                Select your files and output location to start the conversion and download the .robot file.
-              </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-8 px-6 sm:px-8"> {/* Increased padding */}
+            {/* Title and Description outside card */}
+           <h1 className="text-3xl sm:text-4xl font-bold text-primary dark:text-primary-foreground/90 mt-4"> {/* Use h1 */}
+                Playwright to Robot Converter
+            </h1>
+            <p className="text-muted-foreground mt-2 max-w-xl"> {/* Use p */}
+                Select your Playwright Python file(s) and Excel mapping file, choose an output location preference, and convert them to Robot Framework test cases.
+            </p>
+        </div>
+
+
+      {/* Card for the form */}
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-sm bg-card/80 dark:bg-card/70 border border-border/40 rounded-lg overflow-hidden"> {/* Slightly smaller max-width */}
+        {/* CardHeader can be removed if Title/Description are outside */}
+        {/* <CardHeader className="text-center border-b pb-4 bg-card/90 dark:bg-card/80">
+        </CardHeader> */}
+        <CardContent className="pt-6 px-6 sm:px-8"> {/* Adjusted padding */}
           {/* Use the imported Form component which wraps FormProvider */}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -219,7 +254,7 @@ export default function Home() {
                   name="mappingFile"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80"> {/* Adjusted text color */}
+                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80">
                         <FileText className="h-5 w-5 text-primary" />
                         Excel Mapping File (.xlsx)
                       </FormLabel>
@@ -228,7 +263,7 @@ export default function Home() {
                           <Input
                             placeholder="/path/to/your/mapping.xlsx"
                             {...field}
-                            className="flex-grow bg-background/70 dark:bg-background/60" /* Added slight background */
+                            className="flex-grow bg-background/70 dark:bg-background/60"
                           />
                           <Button type="button" variant="outline" onClick={() => handleBrowse('mappingFile')} className="shrink-0">
                             <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -249,7 +284,7 @@ export default function Home() {
                   name="inputFileOrFolder"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80"> {/* Adjusted text color */}
+                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80">
                         <CodeXml className="h-5 w-5 text-primary" />
                         Playwright Python Input
                       </FormLabel>
@@ -258,7 +293,7 @@ export default function Home() {
                             <Input
                                 placeholder={form.getValues('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"}
                                 {...field}
-                                className="flex-grow bg-background/70 dark:bg-background/60" /* Added slight background */
+                                className="flex-grow bg-background/70 dark:bg-background/60"
                                 />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('inputFileOrFolder')} className="shrink-0">
                                 <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -278,7 +313,7 @@ export default function Home() {
                     control={form.control}
                     name="isSingleFile"
                     render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/40 dark:bg-muted/30"> {/* Adjusted transparency */}
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/40 dark:bg-muted/30">
                             <FormControl>
                                 <Checkbox
                                 checked={field.value}
@@ -287,7 +322,7 @@ export default function Home() {
                                 />
                             </FormControl>
                             <div className="space-y-1 leading-none">
-                                <FormLabel htmlFor="isSingleFile" className="font-normal text-foreground/80 dark:text-foreground/70 cursor-pointer"> {/* Adjusted text color */}
+                                <FormLabel htmlFor="isSingleFile" className="font-normal text-foreground/80 dark:text-foreground/70 cursor-pointer">
                                 The input path points to a single Python file (not a folder).
                                 </FormLabel>
                             </div>
@@ -302,7 +337,7 @@ export default function Home() {
                   name="outputFolder"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80"> {/* Adjusted text color */}
+                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80">
                         <FolderOpen className="h-5 w-5 text-primary" />
                         Output Location Preference (for saving path only)
                       </FormLabel>
@@ -311,7 +346,7 @@ export default function Home() {
                             <Input
                               placeholder="/path/to/remember/for/next/time"
                               {...field}
-                              className="flex-grow bg-background/70 dark:bg-background/60" /* Added slight background */
+                              className="flex-grow bg-background/70 dark:bg-background/60"
                             />
                             <Button type="button" variant="outline" onClick={() => handleBrowse('outputFolder')} className="shrink-0">
                               <FolderOpen className="mr-2 h-4 w-4" /> Browse
@@ -321,6 +356,7 @@ export default function Home() {
                             </Button>
                           </div>
                       </FormControl>
+                       <p className="text-xs text-muted-foreground mt-1">This path is saved for convenience but the output file will be downloaded directly to your browser.</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -328,9 +364,9 @@ export default function Home() {
 
 
                 {/* Buttons Row */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-8 border-border/40"> {/* Increased pt, Adjusted border transparency */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t mt-6 border-border/40"> {/* Reduced pt/mt */}
                     {/* Convert Button - Now triggers download */}
-                    <Button type="submit" disabled={isLoading} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105"> {/* Made full width, added hover effect */}
+                    <Button type="submit" disabled={isLoading} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105">
                     {isLoading ? (
                         <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -345,8 +381,6 @@ export default function Home() {
                         </>
                     )}
                     </Button>
-
-                    {/* Removed the View Output button and Dialog */}
                 </div>
             </form>
           </Form>
