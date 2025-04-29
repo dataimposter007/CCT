@@ -1,16 +1,17 @@
 'use server';
 
 import type { z } from 'zod';
+import { z as zod } from 'zod'; // Import z from zod
 
 // Define the expected input shape based on the form schema
 // Re-define or import if the schema is in a shared location
-const FormSchema = z.object({
-  mappingFile: z.string().min(1),
-  inputFileOrFolder: z.string().min(1),
-  outputFolder: z.string().min(1),
+const FormSchema = zod.object({ // Use the imported 'zod' alias
+  mappingFile: zod.string().min(1),
+  inputFileOrFolder: zod.string().min(1),
+  outputFolder: zod.string().min(1),
 });
 
-type FormValues = z.infer<typeof FormSchema>;
+type FormValues = zod.infer<typeof FormSchema>; // Use the imported 'zod' alias
 
 interface ConversionResult {
   success: boolean;
