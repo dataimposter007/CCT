@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    // Adding unoptimized: true globally can impact performance.
+    // It's better to apply it per-image if needed, but this is a workaround for potential issues.
+    // unoptimized: true, // You might consider this if errors persist, but prefer per-image unoptimization
   },
 };
 

@@ -123,6 +123,13 @@ export default function Home() {
     setIsMounted(true);
   }, []);
 
+   // Debugging: Log theme value when it changes and after mount
+  useEffect(() => {
+    if (isMounted) {
+      console.log("Current theme (mounted):", theme);
+    }
+  }, [theme, isMounted]);
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
@@ -294,8 +301,17 @@ export default function Home() {
    // Determine image source based on theme, but only after mount
    // Ensure local paths start with '/' for next/image
     const lightLogo = "/logolight.png"; // Added leading '/'
-    const darkLogo = "https://picsum.photos/240/240?random=1"; // Placeholder for dark mode
-    const imageSrc = !isMounted ? lightLogo : (theme === 'dark' ? darkLogo : lightLogo); // Default to light before mount or when light theme
+    const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Using placeholder for dark as original path was invalid
+
+    // Use a default valid source before hydration to prevent the error
+    const defaultLogo = lightLogo; // Use light logo as a safe default
+
+    // Calculate imageSrc *only after mount* and ensure theme is defined
+    const imageSrc = isMounted && theme
+      ? theme === 'dark'
+        ? darkLogoPlaceholder
+        : lightLogo
+      : defaultLogo;
 
 
   return (
@@ -321,10 +337,14 @@ export default function Home() {
                         className="rounded-lg shadow-lg object-contain bg-transparent" // Added bg-transparent
                         priority // Prioritize loading the logo
                         data-ai-hint="abstract logo"
+                        unoptimized={imageSrc.startsWith('https://picsum.photos')} // Disable optimization for picsum
                     />
                  ) : (
-                    // Placeholder div with the same dimensions
-                    <div style={{ width: 240, height: 240 }} className="bg-muted/20 rounded-lg shadow-lg animate-pulse"></div>
+                    // Placeholder div with the same dimensions, using the default logo src
+                    <div style={{ width: 240, height: 240 }} className="bg-muted/20 rounded-lg shadow-lg animate-pulse">
+                       {/* Preload the default image to potentially improve LCP */}
+                       <link rel="preload" as="image" href={defaultLogo} />
+                    </div>
                 )}
                 {/* Removed ChevronsRight and second logo */}
            </div>
