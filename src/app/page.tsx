@@ -292,9 +292,10 @@ export default function Home() {
   };
 
    // Determine image source based on theme, but only after mount
-    const lightLogo = "https://storage.googleapis.com/aai-web-samples/code-converter-logo-light-nobg.png";
+   // Ensure local paths start with '/' for next/image
+    const lightLogo = "/logolight.png"; // Added leading '/'
     const darkLogo = "https://picsum.photos/240/240?random=1"; // Placeholder for dark mode
-    const imageSrc = !isMounted ? lightLogo : (theme === 'light' ? lightLogo : darkLogo); // Default to light before mount
+    const imageSrc = !isMounted ? lightLogo : (theme === 'dark' ? darkLogo : lightLogo); // Default to light before mount or when light theme
 
 
   return (
@@ -317,8 +318,9 @@ export default function Home() {
                         alt="Code Converter Logo"
                         width={240} // Tripled size
                         height={240} // Tripled size
-                        className="rounded-lg shadow-lg object-contain" // Changed to rounded-lg and object-contain
+                        className="rounded-lg shadow-lg object-contain bg-transparent" // Added bg-transparent
                         priority // Prioritize loading the logo
+                        data-ai-hint="abstract logo"
                     />
                  ) : (
                     // Placeholder div with the same dimensions
