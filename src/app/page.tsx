@@ -51,10 +51,38 @@ function downloadFile(filename: string, content: string) {
 
 // Simple Menu Bar Component
 const MenuBar = () => {
+    const [isMounted, setIsMounted] = useState(false);
     const { theme, setTheme } = useTheme();
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+
     const toggleTheme = () => {
         setTheme(theme === 'light' ? 'dark' : 'light');
     };
+
+     // Render null or a placeholder until mounted to avoid hydration mismatch
+    const renderThemeToggle = () => {
+        if (!isMounted) {
+            // Render a placeholder or nothing during server render / initial client render
+            return <div className="h-8 w-[76px]"></div>; // Placeholder matching switch size + icons
+        }
+        return (
+            <div className="flex items-center space-x-2">
+                <Sun className="h-5 w-5 text-muted-foreground" />
+                <Switch
+                    checked={theme === 'dark'}
+                    onCheckedChange={toggleTheme}
+                    aria-label="Toggle dark mode"
+                    id="theme-switch-nav"
+                />
+                <Moon className="h-5 w-5 text-muted-foreground" />
+            </div>
+        );
+    };
+
 
     return (
         // Removed max-w-4xl and mx-auto to make it full width within its container
@@ -62,7 +90,7 @@ const MenuBar = () => {
         <nav className="w-full flex justify-between items-baseline py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
             <div className="flex items-baseline space-x-4"> {/* Changed items-center to items-baseline */}
                  {/* NOKIA Brand Text */}
-                 <span className="text-3xl font-extrabold text-primary-foreground dark:text-primary-foreground/90 mr-6"> {/* Increased size, weight and margin */}
+                 <span className="text-3xl font-extrabold text-primary dark:text-primary mr-6"> {/* Increased size, weight and margin, changed color */}
                     NOKIA
                  </span>
                  {/* End NOKIA Brand Text */}
@@ -77,16 +105,7 @@ const MenuBar = () => {
                     </Button>
                 </Link>
             </div>
-            <div className="flex items-center space-x-2">
-                <Sun className="h-5 w-5 text-muted-foreground" />
-                <Switch
-                    checked={theme === 'dark'}
-                    onCheckedChange={toggleTheme}
-                    aria-label="Toggle dark mode"
-                    id="theme-switch-nav"
-                />
-                <Moon className="h-5 w-5 text-muted-foreground" />
-            </div>
+            {renderThemeToggle()} {/* Render theme toggle conditionally */}
         </nav>
     );
 };
@@ -95,8 +114,14 @@ const MenuBar = () => {
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [progressValue, setProgressValue] = useState(0); // State for progress bar
+  const [isMounted, setIsMounted] = useState(false); // State to track client mount
   const { toast } = useToast();
   const { theme } = useTheme(); // Get current theme
+
+  // Effect to set isMounted to true after component mounts on client
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
 
   const form = useForm<FormValues>({
@@ -266,6 +291,11 @@ export default function Home() {
     }
   };
 
+   // Determine image source based on theme, but only after mount
+    const lightLogo = "https://storage.googleapis.com/aai-web-samples/code-converter-logo-light-nobg.png";
+    const darkLogo = "https://picsum.photos/240/240?random=1"; // Placeholder for dark mode
+    const imageSrc = !isMounted ? lightLogo : (theme === 'light' ? lightLogo : darkLogo); // Default to light before mount
+
 
   return (
     // Use padding and flex to arrange elements
@@ -279,14 +309,21 @@ export default function Home() {
        <div className="flex flex-col items-center mb-6 text-center">
            {/* Single Logo Placeholder - Centered and Enlarged */}
            <div className="flex justify-center items-center mb-4">
-               <Image
-                 src={theme === 'light' ? "https://storage.googleapis.com/aai-web-samples/code-converter-logo-light.png" : "https://picsum.photos/240/240?random=1"} // Conditional logo based on theme
-                 alt="Code Converter Logo"
-                 width={240} // Tripled size
-                 height={240} // Tripled size
-                 className="rounded-lg shadow-lg object-contain" // Changed to rounded-lg and object-contain
-                 priority // Prioritize loading the logo
-               />
+               {/* Render Image only after mount to avoid hydration error */}
+                {isMounted ? (
+                    <Image
+                        key={imageSrc} // Add key to force re-render on src change if needed
+                        src={imageSrc}
+                        alt="Code Converter Logo"
+                        width={240} // Tripled size
+                        height={240} // Tripled size
+                        className="rounded-lg shadow-lg object-contain" // Changed to rounded-lg and object-contain
+                        priority // Prioritize loading the logo
+                    />
+                 ) : (
+                    // Placeholder div with the same dimensions
+                    <div style={{ width: 240, height: 240 }} className="bg-muted/20 rounded-lg shadow-lg animate-pulse"></div>
+                )}
                 {/* Removed ChevronsRight and second logo */}
            </div>
             {/* Title removed */}
@@ -466,5 +503,3 @@ export default function Home() {
     </main>
   );
 }
-
-
