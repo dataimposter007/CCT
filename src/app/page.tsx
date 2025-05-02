@@ -300,9 +300,9 @@ export default function Home() {
   };
 
    // Determine image source based on theme, but only after mount
-   // Ensure local paths start with '/' for next/image
+   // Ensure local paths start with '/' for next/image - assumes image is in `public` folder
     const lightLogo = "/logolight.png"; // Path to the local light mode logo in public folder
-    const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Using placeholder for dark as original path was invalid
+    const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Using placeholder for dark
 
     // Use a default valid source before hydration to prevent the error
     const defaultLogo = lightLogo; // Use light logo as a safe default
@@ -312,7 +312,10 @@ export default function Home() {
       ? theme === 'dark'
         ? darkLogoPlaceholder
         : lightLogo
-      : defaultLogo;
+      : defaultLogo; // Use defaultLogo before mount
+
+     // Determine if optimization should be disabled (only for external URLs)
+     const unoptimized = imageSrc.startsWith('https://');
 
 
   return (
@@ -339,7 +342,7 @@ export default function Home() {
                         priority // Prioritize loading the logo
                         data-ai-hint="abstract logo"
                         // Disable optimization only for external URLs like picsum
-                        unoptimized={imageSrc === darkLogoPlaceholder}
+                        unoptimized={unoptimized}
                     />
                  ) : (
                     // Placeholder div with the same dimensions, using the default logo src
