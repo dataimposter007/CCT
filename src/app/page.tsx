@@ -1,3 +1,4 @@
+
 'use client';
 
 import type React from 'react';
@@ -300,7 +301,7 @@ export default function Home() {
 
    // Determine image source based on theme, but only after mount
    // Ensure local paths start with '/' for next/image
-    const lightLogo = "/logolight.png"; // Added leading '/'
+    const lightLogo = "/logolight.png"; // Path to the local light mode logo in public folder
     const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Using placeholder for dark as original path was invalid
 
     // Use a default valid source before hydration to prevent the error
@@ -337,7 +338,8 @@ export default function Home() {
                         className="rounded-lg shadow-lg object-contain bg-transparent" // Added bg-transparent
                         priority // Prioritize loading the logo
                         data-ai-hint="abstract logo"
-                        unoptimized={imageSrc.startsWith('https://picsum.photos')} // Disable optimization for picsum
+                        // Disable optimization only for external URLs like picsum
+                        unoptimized={imageSrc === darkLogoPlaceholder}
                     />
                  ) : (
                     // Placeholder div with the same dimensions, using the default logo src
