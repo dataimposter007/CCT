@@ -2,16 +2,16 @@
 
 import type React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { useForm, type SubmitHandler, FormProvider } from 'react-hook-form'; // Import FormProvider
+import { useForm, type SubmitHandler, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Mail, Loader2, Sun, Moon, Upload, Sheet as SheetIcon } from 'lucide-react'; // Added SheetIcon
+import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Mail, Loader2, Sun, Moon, Upload, Sheet as SheetIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { convertCode, getSheetNames } from './actions'; // Import getSheetNames
+import { convertCode, getSheetNames } from './actions';
 import { useTheme } from 'next-themes';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,12 +24,12 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"; // Import Select components
+} from "@/components/ui/select";
 
 // Define Zod schema for CLIENT-SIDE form state
 const ClientFormSchema = z.object({
   mappingFile: z.instanceof(File, { message: "Mapping file is required." }).nullable(),
-  selectedSheetName: z.string().min(1, { message: "Please select a sheet." }).nullable(), // Added sheet name field
+  selectedSheetName: z.string().min(1, { message: "Please select a sheet." }).nullable(),
   inputFileOrFolder: z.union([
       z.instanceof(File, { message: "Input file is required." }),
       z.array(z.instanceof(File)).min(1, "At least one input file is required.")
@@ -203,15 +203,13 @@ export default function Home() {
            const result = await getSheetNames(formData);
            if (result.success && result.sheetNames) {
                setAvailableSheetNames(result.sheetNames);
-               // Optionally set the first sheet as default if desired
-               // if (result.sheetNames.length > 0) {
-               //    form.setValue('selectedSheetName', result.sheetNames[0], { shouldValidate: true });
-               // }
                toast({ title: "Sheets Loaded", description: `Found sheets: ${result.sheetNames.join(', ')}` });
            } else {
+               setAvailableSheetNames([]); // Ensure sheet names are cleared on error
                toast({ title: 'Error Loading Sheets', description: result.error || 'Could not read sheets from the Excel file.', variant: 'destructive' });
            }
        } catch (error: any) {
+           setAvailableSheetNames([]); // Ensure sheet names are cleared on error
            toast({ title: 'Error Loading Sheets', description: `An error occurred: ${error.message}`, variant: 'destructive' });
        } finally {
            setIsFetchingSheets(false);
@@ -253,19 +251,33 @@ export default function Home() {
                       handleClear('inputFileOrFolder');
                  }
             } else {
-                const fileList = Array.from(files).filter(f => f.name.endsWith('.py'));
-                if (fileList.length === 0 && files.length > 0) {
+                // Filter files to ensure they are valid File objects and have a non-empty webkitRelativePath
+                const validFiles = Array.from(files).filter(f => f instanceof File && f.webkitRelativePath);
+
+                const fileList = validFiles.filter(f => f.name.endsWith('.py'));
+
+                if (validFiles.length > 0 && fileList.length === 0) {
                     toast({ title: 'No Python Files', description: 'The selected folder does not contain any Python (.py) files.', variant: 'destructive' });
                     handleClear('inputFileOrFolder');
-                } else {
+                } else if (fileList.length > 0) {
                     setInputFiles(fileList);
                     form.setValue('inputFileOrFolder', fileList, { shouldValidate: true });
-                    if(displayInput) displayInput.value = `${fileList.length} Python files selected`;
+                    // Extract folder name from the first file's path
+                    const folderName = fileList[0].webkitRelativePath.split('/')[0];
+                    if(displayInput) displayInput.value = `${folderName} (${fileList.length} file${fileList.length > 1 ? 's' : ''})`;
+                } else {
+                     // Handle cases where no files are selected or only non-python files are present
+                     handleClear('inputFileOrFolder');
+                     if (validFiles.length > 0) { // Selected folder but only non-python files
+                        toast({ title: 'No Python Files', description: 'The selected folder does not contain any Python (.py) files.', variant: 'destructive' });
+                     }
                 }
             }
         } else if (fieldName === 'outputFolder') {
-             const folderName = files[0].webkitRelativePath?.split('/')[0] || files[0].name;
-             form.setValue('outputFolder', folderName);
+            // For folder selection, `files[0]` might exist but `webkitRelativePath` is the key
+            const relativePath = files[0]?.webkitRelativePath;
+             const folderName = relativePath ? relativePath.split('/')[0] : 'Selected Folder';
+             form.setValue('outputFolder', folderName); // Store the folder name
              if(displayInput) displayInput.value = folderName;
         }
     } else {
@@ -291,8 +303,13 @@ export default function Home() {
            form.resetField('selectedSheetName', { defaultValue: null }); // Reset sheet name too
            setAvailableSheetNames([]); // Clear sheet names
            if (displayInput) displayInput.value = '';
-           const sheetDisplay = document.getElementById('displayInput-selectedSheetName') as HTMLInputElement | null; // Assuming you have a display for sheet
-           if(sheetDisplay) sheetDisplay.value = ''; // Clear sheet display if exists
+           // Clear sheet display if exists
+           const sheetTrigger = document.getElementById('displayInput-selectedSheetName');
+           if (sheetTrigger) {
+               // For SelectTrigger, we might need to reset its visual state differently
+               // E.g., update the placeholder text or reset the Select component's value externally if needed
+               // form.resetField might handle this depending on Select's integration
+           }
        } else if (fieldName === 'inputFileOrFolder') {
            setInputFiles(null);
            form.resetField('inputFileOrFolder', { defaultValue: null });
@@ -315,10 +332,15 @@ export default function Home() {
      const isValid = await form.trigger();
      if (!isValid) {
          toast({ title: 'Validation Error', description: 'Please fix the errors in the form.', variant: 'destructive' });
-         // Find the first error and focus the corresponding element if possible
          const firstErrorField = Object.keys(form.formState.errors)[0] as keyof FormValues | undefined;
          if (firstErrorField) {
-             form.setFocus(firstErrorField);
+             // Try focusing the display input associated with the error field
+             const displayInput = document.getElementById(`displayInput-${firstErrorField}`);
+             if (displayInput) {
+                 displayInput.focus();
+             } else {
+                 form.setFocus(firstErrorField); // Fallback to react-hook-form's focus
+             }
          }
          return;
      }
@@ -354,7 +376,7 @@ export default function Home() {
                  setIsLoading(false);
                  return;
              }
-             inputFiles.forEach(file => formData.append('inputFileOrFolder', file));
+             inputFiles.forEach(file => formData.append('inputFileOrFolder', file, file.webkitRelativePath || file.name)); // Include relative path for server processing
          } else {
              formData.append('inputFileOrFolder', inputFiles);
          }
@@ -403,14 +425,24 @@ export default function Home() {
     }
   };
 
+    // Define logo paths (ensure logolight.png is in the /public directory)
+    const lightLogo = "/logolight.png"; // Path relative to the public directory
+    const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Keep placeholder for dark mode or replace
 
-    const lightLogo = "/logolight.png";
-    // Keep placeholder or remove if light logo is always used initially
-    const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1";
     // Determine the source based on mount state and theme
-    const imageSrc = isMounted && theme === 'dark' ? darkLogoPlaceholder : lightLogo;
-     // Optimization flag (only needed if using external URLs like picsum)
-     const unoptimized = typeof imageSrc === 'string' && imageSrc.startsWith('https://');
+    // Default to light logo before mounting or if theme is light
+    const imageSrc = !isMounted ? lightLogo : (theme === 'dark' ? darkLogoPlaceholder : lightLogo);
+
+    // Optimization is generally not needed for local images served by Next.js
+    const unoptimized = typeof imageSrc === 'string' && imageSrc.startsWith('https://');
+
+    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+        const target = e.target as HTMLImageElement;
+        console.error(`Image failed to load: ${target.src}`);
+        // Optional: Set a fallback image source
+        // target.src = '/fallback-logo.png';
+    };
+
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 relative">
@@ -418,31 +450,32 @@ export default function Home() {
 
        <div className="flex flex-col items-center mb-6 text-center">
            <div className="relative w-60 h-60 mb-4"> {/* Increased size container */}
-                 <Image
-                    key={imageSrc} // Use key to ensure re-render on change
-                    src={imageSrc}
-                    alt="Code Converter Logo"
-                    fill // Use fill and object-contain for responsive sizing within container
-                    className="rounded-lg shadow-lg object-contain bg-transparent" // Keep background transparent
-                    priority
-                    data-ai-hint="abstract logo"
-                    unoptimized={unoptimized} // Use only if needed for external URLs
-                    onError={(e) => console.error("Image failed to load:", e.target)} // Add error handler
-                 />
-                {!isMounted && ( // Show skeleton only if not mounted (optional, Image handles loading state)
+                 {/* Render Image only after mount to avoid potential mismatch on initial load */}
+                 {isMounted ? (
+                     <Image
+                         key={imageSrc} // Add key to force re-render on src change if needed
+                         src={imageSrc}
+                         alt="Code Converter Logo"
+                         fill
+                         className="rounded-lg shadow-lg object-contain bg-transparent" // Keep background transparent
+                         priority={imageSrc === lightLogo} // Prioritize loading the default light logo
+                         data-ai-hint="abstract logo"
+                         unoptimized={unoptimized} // Use only if needed for external URLs
+                         onError={handleImageError} // Use the refined error handler
+                     />
+                 ) : (
+                    // Optional: Show a placeholder or skeleton while waiting for mount
                     <div role="status" aria-label="Loading logo..." className="absolute inset-0 bg-muted/20 rounded-lg shadow-lg animate-pulse z-10"></div>
-                )}
+                 )}
            </div>
         </div>
 
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-[28px] bg-card/[0.03] dark:bg-card/[0.03] border border-border/10 rounded-2xl overflow-hidden">
+      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-[28px] bg-card/5 dark:bg-card/5 border border-border/10 rounded-2xl overflow-hidden">
         <CardContent className="pt-6 px-6 sm:px-8">
-          {/* Wrap form content with FormProvider */}
            <FormProvider {...form}>
-             {/* Use a native <form> element when submitting FormData */}
             <form onSubmit={(e) => {
-                e.preventDefault(); // Prevent default form submission
-                form.handleSubmit(onSubmit)(); // Trigger react-hook-form's submit handler
+                e.preventDefault();
+                form.handleSubmit(onSubmit)();
             }} className="space-y-6">
                 {/* Mapping File Input */}
                 <FormField
@@ -499,15 +532,15 @@ export default function Home() {
                        </FormLabel>
                        <Select
                          onValueChange={field.onChange}
-                         value={field.value ?? undefined} // Use field.value
-                         disabled={availableSheetNames.length === 0 || isFetchingSheets}
+                         value={field.value ?? ""} // Ensure value is controlled, use empty string for no selection
+                         disabled={availableSheetNames.length === 0 || isFetchingSheets || !mappingFile}
                        >
                          <FormControl>
                            <SelectTrigger id="displayInput-selectedSheetName" className="bg-background/10 dark:bg-background/[0.05] border-border/20">
                              <SelectValue placeholder={
                                isFetchingSheets ? "Loading sheets..." :
                                !mappingFile ? "Upload mapping file first" :
-                               availableSheetNames.length === 0 ? "No sheets found" :
+                               availableSheetNames.length === 0 && !isFetchingSheets ? "No sheets found/readable" :
                                "Select a sheet"
                                } />
                            </SelectTrigger>
@@ -518,6 +551,10 @@ export default function Home() {
                                {sheet}
                              </SelectItem>
                            ))}
+                           {/* Optionally add a message if loading failed or no sheets */}
+                           {!isFetchingSheets && mappingFile && availableSheetNames.length === 0 && (
+                             <div className="p-2 text-sm text-muted-foreground">No valid sheets found.</div>
+                           )}
                          </SelectContent>
                        </Select>
                        <FormMessage />
@@ -549,6 +586,7 @@ export default function Home() {
                                     id="fileInput-inputFileOrFolder"
                                     style={{ display: 'none' }}
                                     onChange={(e) => handleFileChange(e, 'inputFileOrFolder')}
+                                    // Attributes like accept, webkitdirectory are set dynamically in triggerFileInput
                                 />
                             <Button
                                 type="button"
@@ -580,9 +618,9 @@ export default function Home() {
                                     onCheckedChange={(checked) => {
                                         const isChecked = checked === true; // Ensure boolean
                                         field.onChange(isChecked);
-                                        // Reset inputFiles state when changing mode
+                                        // Reset inputFiles state and display when changing mode
                                         setInputFiles(null);
-                                        form.setValue('inputFileOrFolder', null, { shouldValidate: true }); // Reset form value too
+                                        form.setValue('inputFileOrFolder', null, { shouldValidate: true });
                                         const displayInput = document.getElementById('displayInput-inputFileOrFolder') as HTMLInputElement | null;
                                         if (displayInput) displayInput.value = '';
                                     }}
