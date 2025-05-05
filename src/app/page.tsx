@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm, type SubmitHandler, FormProvider } from 'react-hook-form'; // Added FormProvider
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
 import Image from 'next/image'; // Import next/image
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Mail, Loader2, Sun, Moon, Upload, AlertTriangle } from 'lucide-react'; // Added Upload, AlertTriangle
 import { useToast } from '@/hooks/use-toast';
-// Removed import { savePaths, loadPaths } from '@/lib/path-persistence';
 import { convertCode, getSheetNames } from './actions'; // Import server actions
 import { useTheme } from 'next-themes';
 import { Switch } from '@/components/ui/switch';
@@ -31,7 +30,6 @@ const FormSchema = zod.object({
   ]),
   isSingleFile: zod.boolean().default(false).optional(),
   selectedSheetName: zod.string().min(1, 'Please select a sheet from the mapping file.'), // Added for sheet selection
-  // Removed outputFolder: z.string().min(1, 'Output folder path is required.'),
 });
 
 type FormValues = zod.infer<typeof FormSchema>;
@@ -126,13 +124,15 @@ export default function Home() {
   // File input refs
   const mappingFileInputRef = useRef<HTMLInputElement>(null);
   const inputFilesInputRef = useRef<HTMLInputElement>(null);
-  const darkLogoPlaceholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // 1x1 transparent pixel
 
+  // Define logo paths relative to the public directory
+  const lightLogoPath = '/light.png';
+  // Use a placeholder or the light logo if dark logo isn't provided/doesn't exist
+  const darkLogoPath = '/light.png'; // Replace with actual dark logo path e.g., '/dark.png' if available, or keep light as fallback/placeholder
+  const darkLogoPlaceholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // 1x1 transparent pixel for cases where dark isn't ready
 
   // State for the dynamically determined image source
-  // Initialize with the light mode logo path, ensuring it starts with '/'
-  const lightLogo = '/logolight.png';
-  const [imageSrc, setImageSrc] = useState(lightLogo); // Start with light logo
+  const [imageSrc, setImageSrc] = useState(lightLogoPath); // Start with light logo
 
 
   // Effect to set isMounted to true after component mounts on client
@@ -145,7 +145,10 @@ export default function Home() {
         if (isMounted) {
             // Determine the correct logo based on the theme
             const resolvedTheme = theme === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
-            const currentSrc = resolvedTheme === 'dark' ? darkLogoPlaceholder : lightLogo; // Use placeholder for dark
+            // Use specific logo paths based on the theme
+            const currentSrc = resolvedTheme === 'dark' ? darkLogoPath : lightLogoPath;
+            // Note: Consider adding a check here if darkLogoPath is just a placeholder
+            // and use darkLogoPlaceholder instead if needed. For now, assuming darkLogoPath exists or light is used.
             setImageSrc(currentSrc);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,13 +158,12 @@ export default function Home() {
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      // Initialize file fields as null or undefined, Zod handles the validation
       mappingFile: undefined,
       inputFileOrFolder: undefined,
-      isSingleFile: false, // Default value for checkbox
-      selectedSheetName: '', // Default for sheet selection
+      isSingleFile: false,
+      selectedSheetName: '',
     },
-    mode: 'onChange', // Validate on change to enable/disable sheet select
+    mode: 'onChange',
   });
 
   const isSingleFile = form.watch('isSingleFile');
@@ -169,10 +171,9 @@ export default function Home() {
 
   // --- Fetch Sheet Names ---
   useEffect(() => {
-    // Reset sheets when mapping file changes or is cleared
     setSheetNames([]);
     setSheetError(null);
-    form.setValue('selectedSheetName', ''); // Reset sheet selection
+    form.setValue('selectedSheetName', '');
 
     if (mappingFile instanceof File && mappingFile.size > 0) {
       setIsFetchingSheets(true);
@@ -184,7 +185,6 @@ export default function Home() {
           if (result.success && result.sheetNames) {
             setSheetNames(result.sheetNames);
             setSheetError(null);
-            // Auto-select first sheet if available
             if (result.sheetNames.length > 0) {
               form.setValue('selectedSheetName', result.sheetNames[0], { shouldValidate: true });
             }
@@ -212,7 +212,7 @@ export default function Home() {
           setIsFetchingSheets(false);
         });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Trigger only when mappingFile changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mappingFile]);
 
 
@@ -220,34 +220,30 @@ export default function Home() {
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     if (isLoading) {
-      setProgressValue(10); // Start progress immediately
+      setProgressValue(10);
       timer = setInterval(() => {
         setProgressValue((prev) => {
-          if (prev >= 95) { // Simulate stalling near the end
+          if (prev >= 95) {
              if (timer) clearInterval(timer);
              return 95;
           }
-          return prev + 5; // Increment progress
+          return prev + 5;
         });
-      }, 150); // Adjust interval for desired speed (matches simulated delay)
+      }, 150);
     } else {
-      // If loading finishes quickly or is cancelled, ensure progress reaches 100
        if (progressValue > 0 && progressValue < 100) {
            setProgressValue(100);
        } else if (progressValue === 100) {
-          // Optional: Hide progress bar after a short delay
+         // Optionally hide progress bar
          // setTimeout(() => setProgressValue(0), 500);
        }
-       // else progress is 0, do nothing
     }
 
-    return () => { // Cleanup interval on unmount or when isLoading changes
+    return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isLoading, progressValue]); // Added progressValue dependency to handle setting to 100% correctly
+  }, [isLoading, progressValue]);
 
-
-  // Removed useEffect for loading/saving paths
 
   // --- File Handling ---
   const handleFileChange = (
@@ -256,7 +252,13 @@ export default function Home() {
   ) => {
     const files = event.target.files;
     if (!files || files.length === 0) {
-      form.setValue(fieldName, undefined, { shouldValidate: true }); // Clear value if no file selected
+      form.setValue(fieldName, undefined, { shouldValidate: true });
+      // Clear the input ref value as well
+      if (fieldName === 'mappingFile' && mappingFileInputRef.current) {
+          mappingFileInputRef.current.value = '';
+      } else if (fieldName === 'inputFileOrFolder' && inputFilesInputRef.current) {
+          inputFilesInputRef.current.value = '';
+      }
       return;
     }
 
@@ -267,8 +269,7 @@ export default function Home() {
                 description: "Mapping file must be an .xlsx file.",
                 variant: "destructive",
             });
-            form.setValue(fieldName, undefined, { shouldValidate: true }); // Clear value
-            // Reset the input field value so the user can select the same file again if needed after fixing
+            form.setValue(fieldName, undefined, { shouldValidate: true });
              if (mappingFileInputRef.current) {
                  mappingFileInputRef.current.value = '';
              }
@@ -284,7 +285,6 @@ export default function Home() {
                 variant: "destructive",
               });
               form.setValue(fieldName, undefined, { shouldValidate: true });
-              // Reset input ref value
              if (inputFilesInputRef.current) {
                  inputFilesInputRef.current.value = '';
              }
@@ -292,13 +292,12 @@ export default function Home() {
          }
         form.setValue(fieldName, files[0], { shouldValidate: true });
       } else {
-        // Folder mode - filter only .py files
          const pyFiles = Array.from(files).filter(file => file.name.endsWith('.py'));
          if (pyFiles.length === 0) {
               toast({
                 title: "No Python Files Found",
                 description: "The selected folder contains no Python (.py) files.",
-                variant: "warning", // Use warning variant
+                variant: "warning",
               });
               form.setValue(fieldName, undefined, { shouldValidate: true });
          } else {
@@ -311,7 +310,6 @@ export default function Home() {
                  });
             }
          }
-         // Reset input ref value after processing
           if (inputFilesInputRef.current) {
               inputFilesInputRef.current.value = '';
           }
@@ -322,17 +320,17 @@ export default function Home() {
 
   const handleClearFile = (fieldName: 'mappingFile' | 'inputFileOrFolder') => {
     form.setValue(fieldName, undefined, { shouldValidate: true });
-     // Clear the corresponding file input ref
      if (fieldName === 'mappingFile' && mappingFileInputRef.current) {
        mappingFileInputRef.current.value = '';
-       setSheetNames([]); // Also clear sheets
+       setSheetNames([]);
        setSheetError(null);
+       form.setValue('selectedSheetName', '', { shouldValidate: true }); // Reset sheet selection too
      } else if (fieldName === 'inputFileOrFolder' && inputFilesInputRef.current) {
        inputFilesInputRef.current.value = '';
      }
     toast({
         title: "File Cleared",
-        description: `Selected file for ${fieldName === 'mappingFile' ? 'Mapping File' : 'Input'} cleared.`,
+        description: `Selection for ${fieldName === 'mappingFile' ? 'Mapping File' : 'Input'} cleared.`,
         variant: "default",
       });
   };
@@ -340,66 +338,53 @@ export default function Home() {
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
      setIsLoading(true);
-     setProgressValue(0); // Reset progress on new submission
+     setProgressValue(0);
      console.log("Form submitted, preparing FormData...");
 
-     // --- Create FormData ---
      const formData = new FormData();
      formData.append('isSingleFile', String(data.isSingleFile));
 
-      // Append mapping file
      if (data.mappingFile instanceof File) {
          formData.append('mappingFile', data.mappingFile);
      } else {
-         console.error("Mapping file is not a File object:", data.mappingFile);
          toast({ title: 'Error', description: 'Mapping file is missing or invalid.', variant: 'destructive' });
          setIsLoading(false);
          return;
      }
 
-      // Append selected sheet name
      if (data.selectedSheetName) {
          formData.append('selectedSheetName', data.selectedSheetName);
      } else {
-          console.error("Selected sheet name is missing");
           toast({ title: 'Error', description: 'Please select a sheet from the mapping file.', variant: 'destructive' });
           setIsLoading(false);
           return;
      }
 
-      // Append input file(s)
      if (data.isSingleFile && data.inputFileOrFolder instanceof File) {
          formData.append('inputFileOrFolder', data.inputFileOrFolder);
      } else if (!data.isSingleFile && Array.isArray(data.inputFileOrFolder)) {
          data.inputFileOrFolder.forEach(file => {
              if (file instanceof File) {
-                 formData.append('inputFileOrFolder', file); // Append each file for folder mode
-             } else {
-                 console.warn("Found non-File object in inputFileOrFolder array:", file);
+                 formData.append('inputFileOrFolder', file);
              }
          });
           if (formData.getAll('inputFileOrFolder').length === 0) {
-              console.error("Input folder contains no valid File objects.");
               toast({ title: 'Error', description: 'No valid input files found for folder mode.', variant: 'destructive' });
               setIsLoading(false);
               return;
           }
      } else {
-          console.error("Input file(s) are missing or invalid:", data.inputFileOrFolder);
           toast({ title: 'Error', description: 'Input file(s) are missing or invalid.', variant: 'destructive' });
           setIsLoading(false);
           return;
      }
 
-      // Removed saving paths
-
      try {
        console.log("Calling convertCode server action...");
-       const result = await convertCode(formData); // Pass FormData directly
+       const result = await convertCode(formData);
        console.log("Server action result:", result);
 
-       // Ensure progress reaches 100% even if conversion is instant
-       await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
+       await new Promise(resolve => setTimeout(resolve, 50));
        setProgressValue(100);
 
        if (result.success && result.fileName) {
@@ -407,21 +392,15 @@ export default function Home() {
            title: 'Conversion Successful',
            description: `${result.message || 'Starting download...'}`,
          });
-         // Trigger download based on result type
          if (result.fileContent) {
            triggerDownload(result.fileName, result.fileContent);
          } else if (result.zipBuffer) {
-             // Convert ArrayBuffer back to Buffer if needed, or handle ArrayBuffer directly
-             // Assuming zipBuffer is ArrayBuffer like from fetch
-             const buffer = Buffer.from(result.zipBuffer); // Convert ArrayBuffer to Node Buffer
+             const buffer = Buffer.from(result.zipBuffer);
              triggerDownload(result.fileName, buffer);
          } else {
-              console.error("Conversion successful but no downloadable content provided.");
               toast({ title: 'Download Error', description: 'No file content received.', variant: 'destructive' });
          }
-
        } else {
-         console.error("Conversion failed:", result.error);
          toast({
            title: 'Conversion Failed',
            description: result.error || 'An unknown error occurred during conversion.',
@@ -443,10 +422,9 @@ export default function Home() {
          });
      } finally {
        setIsLoading(false);
-        // Optional: Reset progress bar after a short delay
         setTimeout(() => {
             if (progressValue === 100) {
-                setProgressValue(0); // Reset to 0 after completion
+                setProgressValue(0);
             }
         }, 1000);
      }
@@ -456,45 +434,43 @@ export default function Home() {
     // Function to handle image loading errors
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
         const target = e.target as HTMLImageElement;
-        if (target.src.includes('logolight.png')) {
-            // If the light logo fails, maybe try a placeholder or log specific error
-            console.error(`Primary logo failed to load: ${target.src}`);
-            setImageSrc(darkLogoPlaceholder); // Fallback to placeholder
-        } else {
-            console.error(`Image failed to load: ${target.src}`);
+        console.error(`Image failed to load: ${target.src}`);
+        // Fallback to a placeholder if the intended image fails
+        if (imageSrc !== darkLogoPlaceholder) {
+            setImageSrc(darkLogoPlaceholder);
         }
     };
 
 
   return (
-    // Use padding and flex to arrange elements
     <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 relative">
 
-        {/* Menu Bar - Now spans full width */}
         <MenuBar />
-
 
        {/* Logo - Positioned above the card */}
        <div className="flex flex-col items-center mb-6 text-center relative">
-           {/* Single Logo Placeholder - Centered and Enlarged */}
-           <div className="flex justify-center items-center mb-4 h-[240px] w-[240px]"> {/* Fixed size container */}
-               {/* Render Image only after mount to avoid hydration error */}
+           <div className="flex justify-center items-center mb-4 h-[240px] w-[240px] relative"> {/* Added relative positioning */}
+               {/* Render Image only after mount */}
                 {isMounted ? (
                     <Image
-                        key={imageSrc} // Key helps React diff changes
+                        key={imageSrc} // Key helps React manage image changes
                         src={imageSrc}
                         alt="Code Converter Logo"
-                        width={240} // Keep desired size
-                        height={240} // Keep desired size
-                        className="rounded-lg object-contain bg-transparent transition-opacity duration-300 ease-in-out" // Smooth transition
-                        style={{ opacity: imageSrc === darkLogoPlaceholder && theme !== 'dark' ? 0 : 1 }} // Hide placeholder if not dark theme
-                        priority // Prioritize loading the logo
+                        width={240}
+                        height={240}
+                        className="rounded-lg object-contain bg-transparent transition-opacity duration-300 ease-in-out"
+                        style={{ opacity: 1 }} // Always show when mounted
+                        priority // Prioritize logo loading
                         data-ai-hint="abstract logo"
-                        onError={handleImageError} // Add error handler
+                        onError={handleImageError}
                     />
                  ) : (
-                    // Placeholder div with the same dimensions during SSR/initial mount
+                    // Static placeholder during SSR/initial mount
                     <div role="status" aria-label="Loading logo..." className="h-[240px] w-[240px] bg-muted/20 rounded-lg shadow-lg animate-pulse"></div>
+                )}
+                {/* Optional: Loading skeleton overlay, removed !isMounted condition */}
+                {(isLoading || !isMounted) && ( // Show skeleton during loading or if not mounted
+                    <div role="status" aria-label="Loading logo..." className="absolute inset-0 bg-muted/20 rounded-lg shadow-lg animate-pulse z-10"></div>
                 )}
            </div>
         </div>
@@ -502,6 +478,7 @@ export default function Home() {
 
       {/* Card for the form */}
       <Card className="w-full max-w-2xl shadow-xl backdrop-blur-[28px] bg-card/5 dark:bg-card/[0.03] border border-border/10 rounded-2xl overflow-hidden">
+        {/* Applied 97% blur via backdrop-blur-[28px] approx */}
         <CardContent className="pt-6 px-6 sm:px-8">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -510,7 +487,7 @@ export default function Home() {
                 <FormField
                   control={form.control}
                   name="mappingFile"
-                  render={({ field: { onChange, onBlur, name, ref, value }, fieldState }) => ( // Destructure field for access
+                  render={({ field: { value }, fieldState }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80">
                         <FileText className="h-5 w-5 text-primary" />
@@ -518,16 +495,14 @@ export default function Home() {
                       </FormLabel>
                       <FormControl>
                         <div className="flex flex-col sm:flex-row gap-2 items-start">
-                          {/* Hidden actual file input */}
                           <Input
                             type="file"
                             accept=".xlsx"
-                            ref={mappingFileInputRef} // Use ref for the hidden input
+                            ref={mappingFileInputRef}
                             onChange={(e) => handleFileChange(e, 'mappingFile')}
                             className="hidden"
-                            id="mappingFileInput" // Add id for label association
+                            id="mappingFileInput"
                           />
-                           {/* Display area */}
                           <div className="flex-grow flex items-center justify-between p-2 min-h-[40px] rounded-md border border-input bg-background/10 dark:bg-background/[0.05] border-border/20 text-sm">
                              <span className={`truncate ${value ? 'text-foreground' : 'text-muted-foreground'}`}>
                                {value instanceof File ? value.name : "No file selected"}
@@ -538,12 +513,11 @@ export default function Home() {
                                </Button>
                              )}
                            </div>
-                           {/* Custom Upload Button */}
                            <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => mappingFileInputRef.current?.click()} // Trigger hidden input
-                                className="shrink-0 bg-white/50 dark:bg-transparent"
+                                onClick={() => mappingFileInputRef.current?.click()}
+                                className="shrink-0 bg-white/50 dark:bg-transparent dark:text-foreground" // Adjusted dark mode style
                            >
                             <Upload className="mr-2 h-4 w-4" /> Upload File
                           </Button>
@@ -567,7 +541,7 @@ export default function Home() {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
-                        disabled={isFetchingSheets || sheetNames.length === 0 || !!sheetError || !mappingFile} // Disable logic
+                        disabled={isFetchingSheets || sheetNames.length === 0 || !!sheetError || !mappingFile}
                       >
                         <FormControl>
                           <SelectTrigger className="bg-background/10 dark:bg-background/[0.05] border-border/20">
@@ -613,7 +587,6 @@ export default function Home() {
                                 checked={field.value}
                                 onCheckedChange={(checked) => {
                                       field.onChange(checked);
-                                      // Clear the input file/folder field when switching modes
                                       form.setValue('inputFileOrFolder', undefined, { shouldValidate: true });
                                       if (inputFilesInputRef.current) {
                                           inputFilesInputRef.current.value = '';
@@ -635,7 +608,7 @@ export default function Home() {
                 <FormField
                   control={form.control}
                   name="inputFileOrFolder"
-                  render={({ field: { value }, fieldState }) => ( // Only need value here
+                  render={({ field: { value }, fieldState }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80">
                         <CodeXml className="h-5 w-5 text-primary" />
@@ -643,27 +616,25 @@ export default function Home() {
                       </FormLabel>
                        <FormControl>
                           <div className="flex flex-col sm:flex-row gap-2 items-start">
-                             {/* Hidden file input */}
                              <Input
                                 type="file"
-                                accept={isSingleFile ? ".py" : undefined} // Accept only .py for single file
-                                multiple={!isSingleFile} // Allow multiple for folder
-                                webkitdirectory={!isSingleFile ? "true" : undefined} // Enable folder selection
-                                mozdirectory={!isSingleFile ? "true" : undefined} // Firefox support
-                                odirectory={!isSingleFile ? "true" : undefined} // Older Opera support
-                                directory={!isSingleFile ? "true" : undefined} // Standard attribute
+                                accept={isSingleFile ? ".py" : undefined}
+                                multiple={!isSingleFile}
+                                webkitdirectory={!isSingleFile ? "true" : undefined}
+                                mozdirectory={!isSingleFile ? "true" : undefined}
+                                odirectory={!isSingleFile ? "true" : undefined}
+                                directory={!isSingleFile ? "true" : undefined}
                                 ref={inputFilesInputRef}
                                 onChange={(e) => handleFileChange(e, 'inputFileOrFolder')}
                                 className="hidden"
                                 id="inputFilesInput"
                              />
-                              {/* Display area */}
                               <div className="flex-grow flex items-center justify-between p-2 min-h-[40px] rounded-md border border-input bg-background/10 dark:bg-background/[0.05] border-border/20 text-sm">
                                  <span className={`truncate ${value ? 'text-foreground' : 'text-muted-foreground'}`}>
                                    {value instanceof File
-                                     ? value.name // Single file mode
+                                     ? value.name
                                      : Array.isArray(value) && value.length > 0
-                                     ? `${value.length} Python file(s) selected` // Folder mode
+                                     ? `${value.length} Python file(s) selected`
                                      : isSingleFile ? "No file selected" : "No folder selected"}
                                  </span>
                                  {value && (
@@ -672,12 +643,11 @@ export default function Home() {
                                    </Button>
                                  )}
                                </div>
-                              {/* Custom Upload Button */}
                              <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => inputFilesInputRef.current?.click()}
-                                className="shrink-0 bg-white/50 dark:bg-transparent"
+                                className="shrink-0 bg-white/50 dark:bg-transparent dark:text-foreground" // Adjusted dark mode style
                             >
                                 {isSingleFile ? <Upload className="mr-2 h-4 w-4" /> : <FolderOpen className="mr-2 h-4 w-4" />}
                                 {isSingleFile ? "Upload File" : "Select Folder"}
@@ -689,12 +659,8 @@ export default function Home() {
                   )}
                 />
 
-                {/* Removed Output Folder Input */}
-
-
                 {/* Progress Bar and Buttons Row */}
-                <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/20"> {/* Adjusted border alpha */}
-                     {/* Progress Bar */}
+                <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/20">
                      <div className={`transition-opacity duration-300 ${isLoading || progressValue > 0 ? 'opacity-100 h-auto' : 'opacity-0 h-0'}`}>
                         <div className="flex items-center space-x-2">
                             <Progress value={progressValue} className="w-full h-2 transition-all duration-150 ease-linear" />
@@ -702,7 +668,6 @@ export default function Home() {
                         </div>
                      </div>
 
-                     {/* Convert Button */}
                     <Button type="submit" disabled={isLoading || isFetchingSheets} className="w-full text-base py-3 transition-all duration-300 ease-in-out transform hover:scale-105">
                         {isLoading || isFetchingSheets ? (
                         <>
