@@ -181,60 +181,73 @@ export default function Chatbot() {
   };
 
 
-  // Handle text input submission (primarily for feedback now)
+  // Handle text input submission
   const handleSend = async () => {
     const trimmedInput = inputValue.trim();
-    // Only allow sending in feedback state
-    if (trimmedInput === '' || isLoading || chatState !== 'awaiting_feedback') return;
+    if (trimmedInput === '' || isLoading) return;
 
     addMessage('user', trimmedInput);
     setInputValue('');
     setIsLoading(true);
-    setChatState('processing_feedback'); // Move to processing state
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
 
-    try {
-        // Call the server action to send feedback
-        console.log(`Attempting to send feedback: "${trimmedInput}"`);
-        const feedbackResult = await sendFeedbackEmail(trimmedInput);
-        console.log("Feedback send result:", feedbackResult);
+    if (chatState === 'awaiting_feedback') {
+        // --- Handle Feedback Submission ---
+        setChatState('processing_feedback'); // Move to processing state
 
-        if (feedbackResult.success) {
-            addMessage('bot', 'Thank you for your feedback! We have received it.\nIs there anything else I can help with?', true); // Show buttons again
-            toast({
-                title: "Feedback Sent",
-                description: "Your feedback has been recorded (simulated).", // Indicate simulation
-                variant: "default",
-            });
-        } else {
-             // Provide more context if there's an error message from the action
-             const errorMsg = feedbackResult.error ? `: ${feedbackResult.error}` : '.';
-            addMessage('bot', `Sorry, there was an error sending your feedback${errorMsg} Please try again later.\nIs there anything else I can help with?`, true); // Show buttons again
-            toast({
-                title: "Feedback Error",
-                description: feedbackResult.error || "Could not send feedback (simulated).", // Indicate simulation
-                variant: "destructive",
-            });
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+            // Call the server action to send feedback
+            console.log(`[Chatbot] Attempting to send feedback: "${trimmedInput}"`);
+            const feedbackResult = await sendFeedbackEmail(trimmedInput);
+            console.log("[Chatbot] Feedback send result:", feedbackResult);
+
+            if (feedbackResult.success) {
+                addMessage('bot', 'Thank you for your feedback! We have received it.\nIs there anything else I can help with?', true); // Show buttons again
+                toast({
+                    title: "Feedback Sent",
+                    description: "Your feedback has been recorded (simulated).", // Indicate simulation
+                    variant: "default",
+                });
+            } else {
+                 // Provide more context if there's an error message from the action
+                 const errorMsg = feedbackResult.error ? `: ${feedbackResult.error}` : '.';
+                addMessage('bot', `Sorry, there was an error sending your feedback${errorMsg} Please try again later.\nIs there anything else I can help with?`, true); // Show buttons again
+                toast({
+                    title: "Feedback Error",
+                    description: feedbackResult.error || "Could not send feedback (simulated).", // Indicate simulation
+                    variant: "destructive",
+                });
+            }
+            setChatState('awaiting_choice'); // Loop back to choices after feedback attempt
+        } catch (error) {
+          console.error('Chatbot feedback processing error:', error);
+          addMessage('bot', 'Sorry, an unexpected error occurred while sending feedback. How else can I help?', true); // Show buttons on error
+          setChatState('awaiting_choice');
+           toast({
+               title: "Feedback Error",
+               description: "An unexpected error occurred sending your feedback (simulated).", // Indicate simulation
+               variant: "destructive",
+           });
+        } finally {
+            setIsLoading(false);
+            // Refocus input after feedback attempt if needed
+            setTimeout(() => {
+                const inputElement = document.getElementById('chat-input');
+                inputElement?.focus();
+            }, 0);
         }
-        setChatState('awaiting_choice'); // Loop back to choices after feedback attempt
-    } catch (error) {
-      console.error('Chatbot feedback processing error:', error);
-      addMessage('bot', 'Sorry, an unexpected error occurred while sending feedback. How else can I help?', true); // Show buttons on error
-      setChatState('awaiting_choice');
-       toast({
-           title: "Feedback Error",
-           description: "An unexpected error occurred sending your feedback (simulated).", // Indicate simulation
-           variant: "destructive",
-       });
-    } finally {
+    } else {
+        // --- Handle General Text Input (Not Feedback) ---
+        // Simulate bot thinking time
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Respond with the "under development" message
+        addMessage('bot', 'The chatbot is still under development. Please use the buttons for predefined actions.', true); // Show buttons again
+        setChatState('awaiting_choice'); // Return to choice state
         setIsLoading(false);
-        // Refocus input after feedback attempt if needed
-        setTimeout(() => {
-            const inputElement = document.getElementById('chat-input');
-            inputElement?.focus();
-        }, 0);
     }
   };
 
@@ -242,15 +255,12 @@ export default function Chatbot() {
   const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      // Only trigger send if in feedback state
-      if (chatState === 'awaiting_feedback') {
-        handleSend();
-      }
+      handleSend(); // Allow Enter to submit in any state where input is enabled
     }
   };
 
-  // Input is disabled if loading OR if the bot is waiting for a button choice
-  const isInputDisabled = isLoading || chatState === 'awaiting_choice' || chatState === 'processing_feedback';
+  // Input is disabled if loading OR if the bot is waiting for a button choice AND not accepting feedback
+  const isInputDisabled = isLoading || (chatState === 'awaiting_choice');
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -341,8 +351,8 @@ export default function Chatbot() {
               placeholder={
                   chatState === 'awaiting_feedback' ? "Type your feedback here..." :
                   chatState === 'processing_feedback' ? "Processing..." :
-                  chatState === 'awaiting_choice' ? "Please select an option above" : // Updated placeholder
-                   "Select an option or type feedback..." // Fallback
+                  // General placeholder when not specifically asking for feedback
+                  "Type a message or select an option..."
                }
               className="flex-1 h-9 text-sm bg-background/50 dark:bg-background/30 focus:ring-1 focus:ring-primary"
               disabled={isInputDisabled} // Disable based on state
@@ -352,12 +362,12 @@ export default function Chatbot() {
               type="button"
               size="icon"
               onClick={handleSend}
-              // Only enable send button when in feedback state and not loading/processing
-              disabled={isLoading || chatState !== 'awaiting_feedback' || inputValue.trim() === ''}
+              // Enable send button if not loading and input has text
+              disabled={isLoading || inputValue.trim() === ''}
               className="h-9 w-9"
-              aria-label={isLoading && chatState === 'processing_feedback' ? "Sending..." : "Send message"} // More specific aria-label
+              aria-label={isLoading ? "Sending..." : "Send message"} // Simpler label
             >
-              {isLoading && chatState === 'processing_feedback' ? ( // Show loader specifically for feedback processing
+              {isLoading ? ( // Show loader if loading (feedback or general processing)
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Send className="w-4 h-4" />
