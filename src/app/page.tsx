@@ -223,78 +223,29 @@ export default function Home() {
   const handleBrowse = async (fieldName: keyof FormValues) => {
     // Placeholder for actual file/folder browsing logic using Electron/Tauri or web APIs
     // This simulation needs to be replaced with real API calls in the target environment.
-    console.warn("File/Folder browsing/upload simulation. Replace with actual API calls.");
+    // Using window.showOpenFilePicker/showDirectoryPicker is removed due to cross-origin issues in some environments.
+    console.warn("File/Folder browsing/upload simulation. This does not use native pickers.");
 
     const isSingleFile = form.getValues('isSingleFile');
     const isOutput = fieldName === 'outputFolder';
     const isMapping = fieldName === 'mappingFile';
-    const isInput = fieldName === 'inputFileOrFolder';
 
-    // Basic properties for a file/folder dialog
-    const properties: ('openFile' | 'openDirectory')[] = isOutput || (isInput && !isSingleFile)
-        ? ['openDirectory']
-        : ['openFile'];
-
-    // Try to use window.showOpenFilePicker or showDirectoryPicker if available (modern browsers)
-    // Note: These APIs might have security restrictions.
-    try {
-        let selectedPath = '';
-        if (properties.includes('openDirectory')) {
-            // @ts-ignore - showDirectoryPicker might not be typed
-             if (typeof window.showDirectoryPicker === 'function') {
-                 // @ts-ignore
-                const handle = await window.showDirectoryPicker();
-                // We can't get the full path directly for security reasons in standard web APIs.
-                // This simulation will just set a placeholder name.
-                // For Electron/Tauri, you'd get the actual path from the dialog result.
-                selectedPath = `/path/to/selected/folder/${handle.name}`; // Placeholder
-                form.setValue(fieldName, selectedPath);
-             } else {
-                  throw new Error("showDirectoryPicker not available.");
-             }
-
-        } else { // openFile
-             // @ts-ignore - showOpenFilePicker might not be typed
-             if (typeof window.showOpenFilePicker === 'function') {
-                const options = {
-                     types: isMapping ? [{ description: 'Excel Files', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }] :
-                           isInput ? [{ description: 'Python Files', accept: { 'text/x-python': ['.py'] } }] : [],
-                     multiple: false,
-                 };
-                 // @ts-ignore
-                 const [fileHandle] = await window.showOpenFilePicker(options);
-                 selectedPath = `/path/to/selected/file/${fileHandle.name}`; // Placeholder
-                 form.setValue(fieldName, fileHandle.name); // Set to file name only for web
-             } else {
-                  throw new Error("showOpenFilePicker not available.");
-             }
-        }
-
-         toast({
-            title: "Path Selected (Simulated)",
-            description: `Set ${fieldName} to: ${selectedPath || 'Selected item'}`,
-             duration: 3000,
-        });
-
-    } catch (err) {
-        console.error("Error using File System Access API (or simulated browse/upload):", err);
-        // Fallback simulation if web APIs fail or are unavailable
-         let simulatedPath = `/simulated/path/to/`;
-        if (isMapping) {
-            simulatedPath += 'mapping.xlsx';
-        } else if (isOutput) {
-            simulatedPath += 'output_folder';
-        } else { // inputFileOrFolder
-            simulatedPath += isSingleFile ? 'playwright_script.py' : 'playwright_scripts_folder';
-        }
-         form.setValue(fieldName, simulatedPath);
-         toast({
-            title: "Path Selected (Fallback Simulation)",
-            description: `Set ${fieldName} to: ${simulatedPath}`,
-            variant: "default",
-            duration: 3000,
-          });
+    // Fallback simulation
+    let simulatedPath = `/simulated/path/to/`;
+    if (isMapping) {
+        simulatedPath += 'mapping.xlsx';
+    } else if (isOutput) {
+        simulatedPath += 'output_folder';
+    } else { // inputFileOrFolder
+        simulatedPath += isSingleFile ? 'playwright_script.py' : 'playwright_scripts_folder';
     }
+    form.setValue(fieldName, simulatedPath);
+    toast({
+        title: "Path Selected (Simulation)",
+        description: `Set ${fieldName} to: ${simulatedPath}`,
+        variant: "default",
+        duration: 3000,
+    });
   };
 
 
@@ -623,4 +574,4 @@ export default function Home() {
   );
 }
 
-    
+
