@@ -1,3 +1,4 @@
+
 'use client';
 
 import type React from 'react';
@@ -412,14 +413,11 @@ export default function Home() {
     }
   };
 
-    // Define logo paths (ensure logolight.png is in the /public directory)
+    // Define logo paths
     const lightLogo = "/logolight.png"; // Path relative to the public directory
-    const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Keep placeholder for dark mode or replace
+    const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Placeholder for dark mode
 
-    // Determine the source based on mount state and theme
-    // Default to light logo before mounting or if theme is light
-    // Use placeholder if dark theme or image fails to load
-    const [imageSrc, setImageSrc] = useState(lightLogo);
+    const [imageSrc, setImageSrc] = useState(lightLogo); // Initialize with light logo path
 
     useEffect(() => {
         if (isMounted) {
@@ -444,7 +442,7 @@ export default function Home() {
         <MenuBar />
 
        <div className="flex flex-col items-center mb-6 text-center">
-           <div className="relative w-60 h-60 mb-4"> {/* Increased size container */}
+           <div className="relative w-60 h-60 mb-4"> {/* Container for the logo */}
                  {/* Render Image only after mount to avoid potential mismatch on initial load */}
                  {isMounted && (
                      <Image
@@ -455,7 +453,7 @@ export default function Home() {
                          className="rounded-lg shadow-lg object-contain bg-transparent" // Keep background transparent
                          priority={imageSrc === lightLogo} // Prioritize loading the default light logo
                          data-ai-hint="abstract logo"
-                         unoptimized={imageSrc.startsWith('https://')} // Only unoptimize external URLs
+                         unoptimized // Prevent Next.js optimization which might be causing issues
                          onError={handleImageError} // Use the refined error handler
                      />
                  )}
@@ -465,7 +463,7 @@ export default function Home() {
            </div>
         </div>
 
-      <Card className="w-full max-w-2xl shadow-xl backdrop-blur-[28px] bg-card/5 dark:bg-card/5 border border-border/10 rounded-2xl overflow-hidden">
+      <Card className="w-full max-w-2xl shadow-xl bg-card/5 dark:bg-card/5 backdrop-blur-[28px] border border-border/10 rounded-2xl overflow-hidden">
         <CardContent className="pt-6 px-6 sm:px-8">
            <FormProvider {...form}>
             <form onSubmit={(e) => {
@@ -665,3 +663,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
