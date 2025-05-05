@@ -35,7 +35,6 @@ const ClientFormSchema = z.object({
       z.array(z.instanceof(File)).min(1, "At least one input file is required.")
   ]).nullable(),
   isSingleFile: z.boolean().default(false).optional(),
-  // outputFolder: z.string().optional(), // Removed output folder preference
 });
 
 type FormValues = z.infer<typeof ClientFormSchema>;
@@ -49,8 +48,8 @@ function downloadFile(filename: string, data: string | Buffer) {
         mimeType = 'application/zip';
         blob = new Blob([data], { type: mimeType });
     } else {
-        // Assume single file is text/plain
-        mimeType = 'text/plain;charset=utf-8';
+        // Assume single file is text/plain or robot
+        mimeType = filename.endsWith('.robot') ? 'text/plain;charset=utf-8' : 'application/octet-stream';
         blob = new Blob([data], { type: mimeType });
     }
 
@@ -135,7 +134,6 @@ export default function Home() {
       selectedSheetName: null, // Initialize sheet name as null
       inputFileOrFolder: null,
       isSingleFile: false,
-      // outputFolder: '', // Removed default value
     },
   });
 
@@ -161,7 +159,7 @@ export default function Home() {
   }, [isLoading, progressValue, isSingleFile]);
 
 
-  const triggerFileInput = (fieldName: 'mappingFile' | 'inputFileOrFolder') => { // Removed 'outputFolder'
+  const triggerFileInput = (fieldName: 'mappingFile' | 'inputFileOrFolder') => {
     const input = document.getElementById(`fileInput-${fieldName}`) as HTMLInputElement | null;
     if (input) {
         input.value = ''; // Reset input value to allow re-selection of the same file/folder
@@ -182,7 +180,6 @@ export default function Home() {
             input.setAttribute('directory', 'true');
             input.multiple = true;
         }
-        // Removed outputFolder logic
         input.click();
     }
   };
@@ -217,7 +214,7 @@ export default function Home() {
   // Handle file selection
   const handleFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
-    fieldName: 'mappingFile' | 'inputFileOrFolder' // Removed keyof FormValues and outputFolder
+    fieldName: 'mappingFile' | 'inputFileOrFolder'
   ) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -271,7 +268,6 @@ export default function Home() {
                 }
             }
         }
-        // Removed outputFolder logic
     } else {
         // Handle cancellation or no file selection
         if (fieldName === 'mappingFile') {
@@ -279,14 +275,13 @@ export default function Home() {
         } else if (fieldName === 'inputFileOrFolder') {
             handleClear('inputFileOrFolder');
         }
-        // Removed outputFolder logic
     }
      // Clear the value of the hidden input to allow re-selecting the same file/folder
      if(event.target) event.target.value = '';
   };
 
    // Handle clearing file state and form value
-   const handleClear = (fieldName: 'mappingFile' | 'inputFileOrFolder') => { // Removed keyof FormValues and outputFolder
+   const handleClear = (fieldName: 'mappingFile' | 'inputFileOrFolder') => {
        const displayInput = document.getElementById(`displayInput-${fieldName}`) as HTMLInputElement | null;
        if (fieldName === 'mappingFile') {
            setMappingFile(null);
@@ -298,15 +293,12 @@ export default function Home() {
            const sheetTrigger = document.getElementById('displayInput-selectedSheetName');
            if (sheetTrigger) {
                // For SelectTrigger, we might need to reset its visual state differently
-               // E.g., update the placeholder text or reset the Select component's value externally if needed
-               // form.resetField might handle this depending on Select's integration
            }
        } else if (fieldName === 'inputFileOrFolder') {
            setInputFiles(null);
            form.resetField('inputFileOrFolder', { defaultValue: null });
            if (displayInput) displayInput.value = '';
        }
-       // Removed outputFolder logic
        toast({
            title: "Selection Cleared",
            description: `Cleared selection for ${fieldName}.`,
@@ -426,16 +418,24 @@ export default function Home() {
 
     // Determine the source based on mount state and theme
     // Default to light logo before mounting or if theme is light
-    const imageSrc = !isMounted ? lightLogo : (theme === 'dark' ? darkLogoPlaceholder : lightLogo);
+    // Use placeholder if dark theme or image fails to load
+    const [imageSrc, setImageSrc] = useState(lightLogo);
 
-    // Optimization is generally not needed for local images served by Next.js
-    const unoptimized = typeof imageSrc === 'string' && imageSrc.startsWith('https://');
+    useEffect(() => {
+        if (isMounted) {
+            setImageSrc(theme === 'dark' ? darkLogoPlaceholder : lightLogo);
+        }
+    }, [isMounted, theme]);
 
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
         const target = e.target as HTMLImageElement;
-        console.error(`Image failed to load: ${target.src}`);
-        // Optional: Set a fallback image source
-        // target.src = '/fallback-logo.png';
+        // Check if the current source is the light logo, if so, try the placeholder
+        if (target.src.includes(lightLogo)) {
+            console.error(`Light logo failed to load: ${target.src}. Trying placeholder.`);
+            setImageSrc(darkLogoPlaceholder); // Fallback to placeholder
+        } else {
+            console.error(`Image failed to load: ${target.src}`);
+        }
     };
 
 
@@ -446,20 +446,20 @@ export default function Home() {
        <div className="flex flex-col items-center mb-6 text-center">
            <div className="relative w-60 h-60 mb-4"> {/* Increased size container */}
                  {/* Render Image only after mount to avoid potential mismatch on initial load */}
-                 {isMounted ? (
+                 {isMounted && (
                      <Image
-                         key={imageSrc} // Add key to force re-render on src change if needed
+                         key={imageSrc} // Add key to force re-render on src change
                          src={imageSrc}
                          alt="Code Converter Logo"
                          fill
                          className="rounded-lg shadow-lg object-contain bg-transparent" // Keep background transparent
                          priority={imageSrc === lightLogo} // Prioritize loading the default light logo
                          data-ai-hint="abstract logo"
-                         unoptimized={unoptimized} // Use only if needed for external URLs
+                         unoptimized={imageSrc.startsWith('https://')} // Only unoptimize external URLs
                          onError={handleImageError} // Use the refined error handler
                      />
-                 ) : (
-                    // Optional: Show a placeholder or skeleton while waiting for mount
+                 )}
+                 {!isMounted && ( // Show skeleton only if not mounted (optional, Image handles loading state)
                     <div role="status" aria-label="Loading logo..." className="absolute inset-0 bg-muted/20 rounded-lg shadow-lg animate-pulse z-10"></div>
                  )}
            </div>
@@ -630,10 +630,6 @@ export default function Home() {
                         </FormItem>
                     )}
                     />
-
-
-                 {/* Removed Output Folder Input */}
-
 
                 {/* Progress Bar and Buttons Row */}
                 <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/20">
