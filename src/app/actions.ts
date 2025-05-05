@@ -96,6 +96,7 @@ async function loadMappingFromExcel(fileBuffer: Buffer, fileName: string, sheetN
 function findNearestMatch(method_name_with_parens: string, mapping: { [key: string]: string }): string {
     // Python code checks `method_name in key`, meaning the method name (like 'click()') should be a substring of the key in the mapping dict.
     for (const key in mapping) {
+        // Ensure the key is a string before calling includes
         if (typeof key === 'string' && key.includes(method_name_with_parens)) {
             return mapping[key]; // Return the mapped Robot keyword
         }
@@ -199,6 +200,11 @@ function alignRobotCode(inputContent: string): string {
             else if (isTestCaseNameLine && strippedLine) {
                 formattedLines.push(testCaseIndent + strippedLine); // Indent the step
             }
+             // Handle lines that *should* be steps but might lack initial whitespace (e.g., after a blank line)
+             else if (!isTestCaseNameLine && strippedLine && !strippedLine.startsWith('***')) {
+                 // Assume this is a step if it's not a test case name or section header
+                 formattedLines.push(testCaseIndent + strippedLine);
+             }
             // Other lines within Test Cases (should ideally be steps or comments/blanks handled above)
             else {
                  // Preserve potentially misformatted lines, but trimmed
@@ -255,13 +261,15 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
          const stripped = line.trim();
         // Handle page.once specific dismissal/acceptance
         if (stripped.startsWith("page.once(\"dialog\"") && stripped.endsWith("lambda dialog: dialog.dismiss())")) {
-             lines.push('${promise} =       Promise To    Wait For Alert    action=dismiss');
-             lines.push('# <Line which triggers the alert action> ex: Click <button selector>');
+             // Python code adds these two lines specifically for page.once dismiss
+             testCaseLines.push('    ${promise} =       Promise To    Wait For Alert    action=dismiss');
+             testCaseLines.push('    # <Line which triggers the alert action> ex: Click <button selector>');
          } else if (stripped.startsWith("page.once(\"dialog\"") && stripped.endsWith("lambda dialog: dialog.accept())")) {
-             lines.push('${promise} =       Promise To    Wait For Alert    action=accept   # text=<text content of alert box if you want to assert>');
-             lines.push('# <Line which triggers the alert action> ex: Click <button selector>');
+             // Python code adds these two lines for page.once accept
+             testCaseLines.push('    ${promise} =       Promise To    Wait For Alert    action=accept   # text=<text content of alert box if you want to assert>');
+             testCaseLines.push('    # <Line which triggers the alert action> ex: Click <button selector>');
          } else {
-             // Keep other lines, including potentially other page.once uses
+             // Keep other lines, including potentially other page.once uses or non-page.once lines
              lines.push(line);
          }
      });
@@ -285,10 +293,11 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
         if (stripped_line.startsWith("expect(")) {
             // Extract locator using regex - simplified approach
             // Look for common patterns like page.locator, get_by_*
-            let locatorMatch = stripped_line.match(/expect\((?:page\.)?(locator|get_by_.*?)\(['"](.*?)['"](?:,.*?)?\)\)/);
+            // Modified regex to handle variations like page.locator(...) or just locator(...)
+            let locatorMatch = stripped_line.match(/(?:page\.)?(?:locator|get_by_.*?)\(['"](.*?)['"](?:,.*?)?\)/);
             let rfLocator = "";
-            if (locatorMatch && locatorMatch[2]) {
-                rfLocator = extractLocator(locatorMatch[2]); // Extract the core selector
+            if (locatorMatch && locatorMatch[1]) {
+                rfLocator = extractLocator(locatorMatch[1]); // Extract the core selector
             } else {
                 // If a standard locator pattern isn't found inside expect(), try a broader match
                 const fallbackLocatorMatch = stripped_line.match(/expect\((.*?)\)/);
@@ -314,11 +323,13 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
 
             // Generate RF steps based on assertion type
             if (textAssertionMatch) {
-                const expectedText = textAssertionMatch[1];
+                 const expectedText = textAssertionMatch[1];
                  const variable_name = `\${var${variable_counter++}}`;
                  testCaseLines.push(`    ${variable_name}    Set Variable    ${rfLocator}`); // Assign locator to RF variable
                  testCaseLines.push(`    Wait For Elements State    ${variable_name}    visible    timeout=10s`);
-                testCaseLines.push(`    Get Text    ${variable_name}    ==    ${expectedText}`);
+                 // Use '==' for exact match, or 'contains' based on to_contain_text vs to_have_text
+                 const operator = stripped_line.includes('.to_have_text') ? '==' : '*='; // Adjust if needed
+                 testCaseLines.push(`    Get Text    ${variable_name}    ${operator}    ${expectedText}`);
             } else if (visibilityAssertionMatch) {
                  const variable_name = `\${var${variable_counter++}}`;
                  testCaseLines.push(`    ${variable_name}    Set Variable    ${rfLocator}`);
@@ -334,7 +345,8 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
 
 
         // Handle page.goto(...)
-        const gotoMatch = stripped_line.match(/page\d*\.goto\(['"]([^'"]+)['"]\)/);
+        // Matches page.goto("URL") or page1.goto("URL") etc.
+        const gotoMatch = stripped_line.match(/page\d*\.goto\(['"]([^'"]+)['"](?:,\s*\{.*?})?\)/);
          if (gotoMatch) {
              writingStarted = true;
              const url = gotoMatch[1];
@@ -384,7 +396,8 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
         if (commandParts.length < 1) continue;
 
         const methodPart = commandParts[commandParts.length - 1];
-        const locatorChainParts = commandParts.slice(1, -1);
+        // Join locator parts back if split by safeSplit - needed for complex locators like page.get_by_role(...).locator(...)
+        const objectPart = commandParts.length > 1 ? commandParts.slice(0, -1).join('.') : ''; // e.g., "page" or "page.get_by_role(...)"
 
         const methodMatch = methodPart.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
         if (methodMatch) {
@@ -392,40 +405,43 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
             const methodSignature = `${methodNameOnly}()`; // Use '()' for mapping lookup
             let methodArgsRaw = methodMatch[2]?.trim() ?? '';
 
+             // Find the corresponding Robot keyword using the mapping
             const transformedMethod = findNearestMatch(methodSignature, mapping);
 
             // --- Locator Extraction from chain or args ---
              let rfLocator = "";
             let locatorTextRaw = ""; // Store the raw text used to extract locator
-             if (locatorChainParts.length > 0) {
-                 // Extract from the first locator part in the chain
-                 locatorTextRaw = locatorChainParts[0];
-                 rfLocator = extractLocator(locatorChainParts[0]);
-                 // Add warnings for complex chains if needed
-                 if (locatorChainParts.some(p => p === 'first' || p.startsWith('nth'))) {
-                     console.warn(`Complex locator chain detected (.first, .nth). Verify RF selector: ${stripped_line}`);
-                 }
-             } else if (methodArgsRaw) {
-                 // Handle methods where the first arg is the locator (click, check, etc.)
-                  // Exclude methods that take data first (fill, type, press, select_option, goto, wait_for_timeout, evaluate)
-                  const methodsTakingDataFirst = ['fill', 'type', 'press', 'select_option', 'goto', 'wait_for_timeout', 'evaluate'];
-                  if (!methodsTakingDataFirst.includes(methodNameOnly)) {
-                      // Assume the first argument might be the locator
-                      const firstArgMatch = methodArgsRaw.match(/^(['"].*?['"])/); // Match quoted string at the start
-                      if (firstArgMatch) {
-                          locatorTextRaw = firstArgMatch[1];
-                          rfLocator = extractLocator(firstArgMatch[1]);
-                          // Remove the locator argument from methodArgsRaw if it was successfully extracted
-                          methodArgsRaw = methodArgsRaw.substring(firstArgMatch[0].length).replace(/^,\s*/, '').trim(); // Remove locator + potential comma
-                      } else {
-                           // If first arg isn't quoted, it might be a variable or complex expression - treat cautiously
-                            console.warn(`Potentially complex locator argument for ${methodNameOnly}: ${methodArgsRaw}. Manual review needed.`);
-                           // Decide if you want to attempt extraction or leave args as is
-                           // rfLocator = extractLocator(methodArgsRaw.split(',')[0].trim()); // Example: Attempt extraction anyway
-                           // methodArgsRaw = methodArgsRaw.substring(methodArgsRaw.split(',')[0].length).replace(/^,\s*/, '').trim();
+
+            // If the objectPart contains locator methods (like locator, get_by_*)
+             const locatorExtractionMethods = ['locator', 'get_by_text', 'get_by_role', 'get_by_label', 'get_by_placeholder', 'get_by_alt_text', 'get_by_title'];
+             if (locatorExtractionMethods.some(m => objectPart.includes(`.${m}(`)) || objectPart.startsWith('locator(')) {
+                 locatorTextRaw = objectPart; // The chain part itself defines the locator
+                 rfLocator = extractLocator(objectPart);
+             }
+             // Handle cases where locator is the first argument of the *method* (e.g., click, fill)
+             else if (methodArgsRaw) {
+                  // Exclude methods that take data first (press, select_option, wait_for_timeout, evaluate)
+                  // Include methods like click, fill, type, check, dblclick, hover, etc. where locator might be first arg
+                  const methodsTakingLocatorFirst = ['click', 'fill', 'type', 'check', 'uncheck', 'dblclick', 'hover', 'press', 'focus', 'scroll_into_view_if_needed', 'tap', 'set_input_files'];
+                  if (methodsTakingLocatorFirst.includes(methodNameOnly)) {
+                      // Assume the first argument *might* be the locator - requires careful splitting
+                      const argsList = safeSplitOutsideQuotes(methodArgsRaw, ','); // Split args respecting quotes
+                      if (argsList.length > 0) {
+                           const potentialLocatorArg = argsList[0].trim();
+                          // Check if it looks like a locator (starts with quote, #, or contains =)
+                          if (potentialLocatorArg.match(/^['"#.]/) || potentialLocatorArg.includes('=')) {
+                              locatorTextRaw = potentialLocatorArg;
+                              rfLocator = extractLocator(potentialLocatorArg);
+                              // Remove the locator argument from methodArgsRaw
+                              methodArgsRaw = argsList.slice(1).join(',').trim();
+                          } else {
+                              // First arg doesn't look like a typical locator string
+                              // console.warn(`First argument for ${methodNameOnly} is not a simple string locator: ${potentialLocatorArg}. Assuming no locator arg.`);
+                          }
                       }
                   }
              }
+
              // Specific override for get_by_role("button", name="Sign in") -> "Sign in"
              if (locatorTextRaw.includes('get_by_role("button", name=')) {
                  const nameMatch = locatorTextRaw.match(/name=["']([^"']+)["']/);
@@ -443,31 +459,48 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
             }
 
              if (methodNameOnly === "select_option") {
-                 const args = methodArgsRaw.trim();
+                  const argsList = safeSplitOutsideQuotes(methodArgsRaw, ',');
+                  const selectValue = argsList.length > 0 ? argsList[0].trim() : ''; // Get the first arg
                  // Python logic uses the transformed method directly if args starts with '['
                  // otherwise it uses 'Select options by' + locator + 'Value' + args
-                 if (args.startsWith("[") && args.endsWith("]")) {
-                     if (!rfLocator) {
+                  if (selectValue.startsWith("[") && selectValue.endsWith("]")) {
+                     // RF 'Select Options By' keyword expects label or value after the locator
+                      reformatted_line_parts[0] = "Select Options By"; // Change keyword
+                      if (!rfLocator) {
                         console.error(`Missing locator for select_option with list: ${stripped_line}. Using placeholder.`);
                         reformatted_line_parts.push('"MISSING_LOCATOR"');
-                     }
-                      reformatted_line_parts.push(args); // Add the list string as is
-                 } else {
-                     reformatted_line_parts[0] = "Select options by"; // Change keyword
+                      }
+                       // Attempting to select multiple options by *value* is common
+                      reformatted_line_parts.push("Value");
+                      // Reformat the list ['a', 'b'] to "a", "b" for RF multiple selection
+                      const options = selectValue.slice(1, -1).split(',').map(opt => opt.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+                      reformatted_line_parts.push(...options.map(opt => `"${opt}"`));
+                  } else {
+                      // Single selection
+                      reformatted_line_parts[0] = "Select Options By"; // Change keyword
                       if (!rfLocator) {
                          console.error(`Missing locator for select_option: ${stripped_line}. Using placeholder.`);
                          reformatted_line_parts.push('"MISSING_LOCATOR"');
-                     }
-                     reformatted_line_parts.push("Value"); // Add 'Value'
-                     reformatted_line_parts.push(args.replace(/^['"]|['"]$/g, '')); // Add the single value (unquoted)
-                 }
+                      }
+                     reformatted_line_parts.push("Value"); // Assume selecting by value
+                      reformatted_line_parts.push(selectValue.replace(/^['"]|['"]$/g, '')); // Add the single value (unquoted)
+                  }
              } else if (methodArgsRaw) {
                 // Clean args as per python: re.sub(r'^"(.*)"$', r'\1', method_args)
-                 const cleanedArgs = methodArgsRaw.replace(/^"(.*)"$/, '$1'); // Remove outer quotes only if they wrap the whole string
-                 // Only add cleanedArgs if it's not empty after cleaning
-                 if (cleanedArgs) {
-                     reformatted_line_parts.push(cleanedArgs);
-                 }
+                 // Remove outer quotes only if they wrap the whole string
+                 const cleanedArgs = methodArgsRaw.trim().replace(/^['"](.*)['"]$/, '$1');
+
+                // Split potentially multiple arguments
+                const remainingArgsList = safeSplitOutsideQuotes(cleanedArgs, ',');
+
+                 // Add remaining args, unquoting each if necessary
+                 remainingArgsList.forEach(arg => {
+                    const trimmedArg = arg.trim();
+                     if (trimmedArg) {
+                         // Unquote if the argument itself is fully quoted
+                         reformatted_line_parts.push(trimmedArg.replace(/^['"](.*)['"]$/, '$1'));
+                     }
+                 });
              }
 
              testCaseLines.push("    " + reformatted_line_parts.join('    ').trim());
@@ -485,7 +518,8 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
         testCaseLines.push("    Close Browser");
     } else if (writingStarted) { // Add default teardown if conversion started but no explicit close found
         const lastStep = testCaseLines[testCaseLines.length - 1]?.trim();
-        if (lastStep && !lastStep.startsWith('Close Context') && !lastStep.startsWith('Close Browser') && !lastStep.startsWith('Close Browser')) {
+        // Ensure teardown isn't added if already present
+        if (lastStep && !lastStep.startsWith('Close Context') && !lastStep.startsWith('Close Browser')) {
             testCaseLines.push("    Close Context");
             testCaseLines.push("    Close Browser");
         }
@@ -751,6 +785,12 @@ export async function convertCode(formData: FormData): Promise<ConversionResult>
 
 // --- Chatbot Action ---
 export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
+  console.log(`Handling message: "${input.message}"`);
+  if (!process.env.GOOGLE_GENAI_API_KEY) {
+    console.error('MISSING API KEY: The GOOGLE_GENAI_API_KEY environment variable is not set.');
+    return 'Sorry, the chatbot is not configured correctly. Missing API key.';
+  }
+
   try {
     console.log(`Sending message to chatFlow: ${input.message}`);
     const result = await chatFlow(input);
@@ -758,14 +798,26 @@ export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
     return result.answer;
   } catch (error: any) {
     console.error('Error handling chat message in action:', error);
-    // Log more details if available
+    // Log specific details
+    let detailedErrorMessage = 'Sorry, I encountered an error processing your request.';
     if (error instanceof Error) {
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+        console.error('Error Name:', error.name);
+        console.error('Error Message:', error.message);
+        // Check for common API key or permission errors
+        if (error.message.includes('API key not valid') || error.message.includes('permission denied')) {
+            detailedErrorMessage = 'There seems to be an issue with the chatbot configuration (API key or permissions). Please contact support.';
+            console.error('Potential API Key or Permission Issue Detected.');
+        } else if (error.message.includes('quota')) {
+            detailedErrorMessage = 'The chatbot service is currently experiencing high traffic. Please try again later.';
+            console.error('Potential Quota Issue Detected.');
+        }
+        console.error('Error Stack:', error.stack);
     } else {
-      console.error('Unknown error object:', error);
+        console.error('Unknown error object:', error);
     }
-    return 'Sorry, I encountered an error processing your request. Please check the server logs for details.';
+    // Return a user-friendly but informative message
+    return detailedErrorMessage + ' (Check server logs for details)';
   }
 }
+
+    
