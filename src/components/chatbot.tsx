@@ -1,4 +1,3 @@
-
 'use client';
 
 import type React from 'react';
@@ -37,6 +36,7 @@ interface ChoiceButtonsProps {
 }
 const ChoiceButtons: React.FC<ChoiceButtonsProps> = ({ onChoice, disabled }) => {
     return (
+        // Changed flex-row to flex-col and added sm:flex-row for responsiveness
         <div className="flex flex-col sm:flex-row gap-2 mt-2">
             <Button
                 variant="outline"
@@ -357,4 +357,3 @@ export default function Chatbot() {
     </Popover>
   );
 }
-
