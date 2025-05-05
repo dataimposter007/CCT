@@ -11,11 +11,12 @@ import { chatFlow, type ChatFlowInput } from '@/ai/flows/chat-flow'; // Import c
 // IMPORTANT: This is a placeholder. You need a real email sending service (e.g., Nodemailer with SMTP, SendGrid, Mailgun).
 // Environment variables for email credentials are also required.
 async function sendEmail(subject: string, textBody: string): Promise<{ success: boolean, error?: string }> {
-    console.warn("--- Email Sending Simulation ---");
-    console.log(`Attempting to send email to: bhargavams222@gmail.com`); // Added log
-    console.log(`Subject: ${subject}`);
-    console.log(`Body:\n${textBody}`);
-    console.warn("--- End Email Sending Simulation ---");
+    console.log("--- Starting Email Sending Simulation ---"); // Log start
+    const recipientEmail = 'bhargavams222@gmail.com'; // Define recipient clearly
+    console.log(`[SIMULATION] Attempting to send email to: ${recipientEmail}`);
+    console.log(`[SIMULATION] Subject: ${subject}`);
+    console.log(`[SIMULATION] Body:\n${textBody}`);
+    console.log("[SIMULATION] NOTE: This is only a simulation. No real email will be sent."); // Clarify simulation
 
     // In a real implementation:
     // 1. Install a mail library: `npm install nodemailer` (or SDK for SendGrid, etc.)
@@ -40,7 +41,7 @@ async function sendEmail(subject: string, textBody: string): Promise<{ success: 
 
     const mailOptions = {
         from: process.env.EMAIL_FROM || process.env.EMAIL_USER, // sender address
-        to: 'bhargavams222@gmail.com', // list of receivers
+        to: recipientEmail, // Use the defined recipient variable
         subject: subject, // Subject line
         text: textBody, // plain text body
         // html: "<b>Hello world?</b>", // html body (optional)
@@ -48,17 +49,18 @@ async function sendEmail(subject: string, textBody: string): Promise<{ success: 
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log('Feedback email sent successfully (simulated).');
+        console.log('Feedback email sent successfully using real service.'); // Log real success
         return { success: true };
     } catch (error: any) {
-        console.error('Error sending feedback email (simulated):', error);
+        console.error('Error sending feedback email using real service:', error);
         return { success: false, error: `Failed to send email: ${error.message}` };
     }
     */
 
     // For now, simulate success
-     await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
-    console.log("Email simulation completed successfully."); // Added log
+    await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
+    console.log("[SIMULATION] Email simulation completed successfully.");
+    console.log("--- Ending Email Sending Simulation ---"); // Log end
     return { success: true };
 }
 
@@ -1008,30 +1010,32 @@ interface FeedbackResult {
     error?: string;
 }
 export async function sendFeedbackEmail(feedback: string): Promise<FeedbackResult> {
-     console.log("sendFeedbackEmail action called with feedback:", feedback); // Added log
+     console.log("[Feedback Action] Received request to send feedback."); // Log entry
     if (!feedback || typeof feedback !== 'string' || feedback.trim().length === 0) {
-        console.error("Feedback validation failed: Feedback is empty."); // Added log
+        console.error("[Feedback Action] Validation failed: Feedback is empty or not a string.");
         return { success: false, error: 'Feedback cannot be empty.' };
     }
 
     const subject = 'Website Feedback/Suggestion Received';
     const textBody = `User submitted the following feedback:\n\n"${feedback.trim()}"`;
+    console.log(`[Feedback Action] Preparing email with Subject: "${subject}"`);
+    console.log(`[Feedback Action] Email body content: "${textBody}"`);
 
     try {
-        console.log("Calling sendEmail function..."); // Added log
+        console.log("[Feedback Action] Calling sendEmail function...");
         const emailResult = await sendEmail(subject, textBody);
-        console.log("sendEmail function result:", emailResult); // Added log
+        console.log("[Feedback Action] Result from sendEmail function:", emailResult);
 
         if (emailResult.success) {
-            console.log('Feedback email simulated/sent successfully.');
+            console.log('[Feedback Action] Email simulated/sent successfully.');
             return { success: true };
         } else {
-            console.error('Failed to send feedback email (from sendEmail):', emailResult.error);
+            console.error('[Feedback Action] Failed to send feedback email (reported by sendEmail):', emailResult.error);
             return { success: false, error: emailResult.error || 'Failed to send feedback email.' };
         }
     } catch (error: any) {
-        console.error('Error in sendFeedbackEmail action:', error);
-        return { success: false, error: `An unexpected error occurred: ${error.message}` };
+        console.error('[Feedback Action] Unexpected error occurred:', error);
+        return { success: false, error: `An unexpected error occurred while sending feedback: ${error.message}` };
     }
 }
 
