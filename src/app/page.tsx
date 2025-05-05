@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, type SubmitHandler, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -35,7 +35,7 @@ const ClientFormSchema = z.object({
       z.array(z.instanceof(File)).min(1, "At least one input file is required.")
   ]).nullable(),
   isSingleFile: z.boolean().default(false).optional(),
-  outputFolder: z.string().optional(), // Keep for potential future use
+  // outputFolder: z.string().optional(), // Removed output folder preference
 });
 
 type FormValues = z.infer<typeof ClientFormSchema>;
@@ -49,6 +49,7 @@ function downloadFile(filename: string, data: string | Buffer) {
         mimeType = 'application/zip';
         blob = new Blob([data], { type: mimeType });
     } else {
+        // Assume single file is text/plain
         mimeType = 'text/plain;charset=utf-8';
         blob = new Blob([data], { type: mimeType });
     }
@@ -134,7 +135,7 @@ export default function Home() {
       selectedSheetName: null, // Initialize sheet name as null
       inputFileOrFolder: null,
       isSingleFile: false,
-      outputFolder: '',
+      // outputFolder: '', // Removed default value
     },
   });
 
@@ -160,7 +161,7 @@ export default function Home() {
   }, [isLoading, progressValue, isSingleFile]);
 
 
-  const triggerFileInput = (fieldName: 'mappingFile' | 'inputFileOrFolder' | 'outputFolder') => {
+  const triggerFileInput = (fieldName: 'mappingFile' | 'inputFileOrFolder') => { // Removed 'outputFolder'
     const input = document.getElementById(`fileInput-${fieldName}`) as HTMLInputElement | null;
     if (input) {
         input.value = ''; // Reset input value to allow re-selection of the same file/folder
@@ -180,12 +181,8 @@ export default function Home() {
             input.setAttribute('webkitdirectory', 'true');
             input.setAttribute('directory', 'true');
             input.multiple = true;
-        } else if (fieldName === 'outputFolder') {
-             // Output folder selection is visual preference only
-             input.setAttribute('webkitdirectory', 'true');
-             input.setAttribute('directory', 'true');
         }
-
+        // Removed outputFolder logic
         input.click();
     }
   };
@@ -220,7 +217,7 @@ export default function Home() {
   // Handle file selection
   const handleFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
-    fieldName: keyof FormValues
+    fieldName: 'mappingFile' | 'inputFileOrFolder' // Removed keyof FormValues and outputFolder
   ) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -273,29 +270,23 @@ export default function Home() {
                      }
                 }
             }
-        } else if (fieldName === 'outputFolder') {
-            // For folder selection, `files[0]` might exist but `webkitRelativePath` is the key
-            const relativePath = files[0]?.webkitRelativePath;
-             const folderName = relativePath ? relativePath.split('/')[0] : 'Selected Folder';
-             form.setValue('outputFolder', folderName); // Store the folder name
-             if(displayInput) displayInput.value = folderName;
         }
+        // Removed outputFolder logic
     } else {
         // Handle cancellation or no file selection
         if (fieldName === 'mappingFile') {
             handleClear('mappingFile');
         } else if (fieldName === 'inputFileOrFolder') {
             handleClear('inputFileOrFolder');
-        } else if (fieldName === 'outputFolder') {
-            handleClear('outputFolder');
         }
+        // Removed outputFolder logic
     }
      // Clear the value of the hidden input to allow re-selecting the same file/folder
      if(event.target) event.target.value = '';
   };
 
    // Handle clearing file state and form value
-   const handleClear = (fieldName: keyof FormValues) => {
+   const handleClear = (fieldName: 'mappingFile' | 'inputFileOrFolder') => { // Removed keyof FormValues and outputFolder
        const displayInput = document.getElementById(`displayInput-${fieldName}`) as HTMLInputElement | null;
        if (fieldName === 'mappingFile') {
            setMappingFile(null);
@@ -314,10 +305,8 @@ export default function Home() {
            setInputFiles(null);
            form.resetField('inputFileOrFolder', { defaultValue: null });
            if (displayInput) displayInput.value = '';
-       } else if (fieldName === 'outputFolder') {
-           form.resetField('outputFolder', { defaultValue: '' });
-           if (displayInput) displayInput.value = '';
        }
+       // Removed outputFolder logic
        toast({
            title: "Selection Cleared",
            description: `Cleared selection for ${fieldName}.`,
@@ -339,7 +328,13 @@ export default function Home() {
              if (displayInput) {
                  displayInput.focus();
              } else {
-                 form.setFocus(firstErrorField); // Fallback to react-hook-form's focus
+                  // If display input not found (e.g., for sheet dropdown), focus the form element
+                  const formElement = document.querySelector(`[name="${firstErrorField}"]`) as HTMLElement | null;
+                  if (formElement) {
+                     formElement.focus();
+                 } else {
+                    form.setFocus(firstErrorField); // Fallback to react-hook-form's focus
+                 }
              }
          }
          return;
@@ -637,51 +632,7 @@ export default function Home() {
                     />
 
 
-                 {/* Output Folder Input - Preference Only */}
-                 <FormField
-                  control={form.control}
-                  name="outputFolder"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80">
-                        <FolderOpen className="h-5 w-5 text-primary" />
-                        Output Location Preference (Optional)
-                      </FormLabel>
-                      <FormControl>
-                         <div className="flex flex-col sm:flex-row gap-2">
-                             <Input
-                              id="displayInput-outputFolder"
-                              placeholder="Select preferred output folder (optional)"
-                              readOnly
-                              value={field.value || ''}
-                              className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20 cursor-default"
-                            />
-                                <input
-                                    type="file"
-                                    id="fileInput-outputFolder"
-                                    style={{ display: 'none' }}
-                                    webkitdirectory="true"
-                                    directory="true"
-                                    onChange={(e) => handleFileChange(e, 'outputFolder')}
-                                />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => triggerFileInput('outputFolder')}
-                                className="shrink-0 bg-white/50 dark:bg-transparent"
-                            >
-                              <Upload className="mr-2 h-4 w-4" /> Select Folder
-                            </Button>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('outputFolder')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear output folder preference">
-                                <XCircle className="h-5 w-5" />
-                            </Button>
-                          </div>
-                      </FormControl>
-                       <p className="text-xs text-muted-foreground mt-1">The converted file(s) will be downloaded directly via your browser.</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                 {/* Removed Output Folder Input */}
 
 
                 {/* Progress Bar and Buttons Row */}
