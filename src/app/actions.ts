@@ -881,7 +881,8 @@ export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
     console.error('Current environment variables (keys only):', Object.keys(process.env));
     console.error('Attempted to read GOOGLE_GENAI_API_KEY, but it was undefined or empty.');
     console.error('Ensure the key is present in your .env file at the root of the project and the server was restarted after adding it.');
-    return 'Sorry, the chatbot is not configured correctly (missing API key). Please check the server setup or contact support.';
+    // Updated error message
+    return 'The chatbot is still under development. Please cooperate.';
   } else {
      // Log partial key for verification (DO NOT log the full key)
      console.log(`API key found (starts with: ${apiKey.substring(0, 5)}...)`);
@@ -901,7 +902,8 @@ export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
         console.error('Error Message:', error.message);
         // Check for common API key or permission errors
         if (error.message.includes('API key not valid') || error.message.includes('permission denied') || error.message.toLowerCase().includes('api key')) {
-            detailedErrorMessage = 'There seems to be an issue with the chatbot configuration (API key or permissions). Please contact support.';
+             // Updated error message for API/permission issues
+             detailedErrorMessage = 'The chatbot is still under development. Please cooperate.';
             console.error('Potential API Key or Permission Issue Detected.');
         } else if (error.message.includes('quota')) {
             detailedErrorMessage = 'The chatbot service is currently experiencing high traffic. Please try again later.';
@@ -915,5 +917,6 @@ export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
     return detailedErrorMessage + ' (Check server logs for details)';
   }
 }
+
 
 
