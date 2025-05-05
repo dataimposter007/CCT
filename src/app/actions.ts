@@ -1,15 +1,14 @@
-
 'use server';
 
 import type { z } from 'zod';
-import * as zod from 'zod';
-import fs from 'fs/promises';
+import * as zod from 'zod'; // Ensure z is imported
+import fs from 'fs/promises'; // Keep for potential temp file writing if needed, but primarily work with buffers
 import path from 'path';
 import os from 'os';
 import * as xlsx from 'xlsx'; // For reading Excel files
 import AdmZip from 'adm-zip'; // For creating zip files
 
-// --- Helper Functions (Translated from Python) ---
+// --- Helper Functions (Adapted for Buffers/File Objects) ---
 
 /**
  * Splits a string by a delimiter, respecting quotes.
@@ -39,17 +38,18 @@ function safeSplitOutsideQuotes(s: string, delimiter: string = "."): string[] {
 }
 
 /**
- * Loads the mapping from a specific sheet in an Excel file.
- * @param filePath Path to the Excel file.
+ * Loads the mapping from an Excel file buffer.
+ * @param fileBuffer Buffer containing the Excel file content.
+ * @param fileName Original filename (for error messages).
  * @param sheetName Name of the sheet containing the mapping.
  * @returns A dictionary mapping Playwright methods to Robot keywords.
  */
-async function loadMappingFromExcel(filePath: string, sheetName: string = 'Sheet1'): Promise<{ [key: string]: string }> {
+async function loadMappingFromExcel(fileBuffer: Buffer, fileName: string, sheetName: string = 'Sheet1'): Promise<{ [key: string]: string }> {
     try {
-        const workbook = xlsx.readFile(filePath);
+        const workbook = xlsx.read(fileBuffer, { type: 'buffer' }); // Read from buffer
         const worksheet = workbook.Sheets[sheetName];
         if (!worksheet) {
-            throw new Error(`Sheet "${sheetName}" not found in ${filePath}`);
+            throw new Error(`Sheet "${sheetName}" not found in ${fileName}`);
         }
         const jsonData = xlsx.utils.sheet_to_json<{
             Actual_core_python_playwright_methods: string;
@@ -66,8 +66,8 @@ async function loadMappingFromExcel(filePath: string, sheetName: string = 'Sheet
         });
         return mapping;
     } catch (error: any) {
-        console.error(`Error loading mapping from Excel: ${error.message}`);
-        throw new Error(`Failed to load mapping from ${path.basename(filePath)}: ${error.message}`);
+        console.error(`Error loading mapping from Excel buffer (${fileName}): ${error.message}`);
+        throw new Error(`Failed to load mapping from ${fileName}: ${error.message}`);
     }
 }
 
@@ -324,8 +324,10 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
             const haveTextMatch = stripped_line.match(/\.to_have_text\("([^"]+)"\)/);
              if (haveTextMatch && locator !== 'css=body') {
                  // Use Get Text and Should Be Equal for exact match assertion
+                 // Needs a variable to store the result first
+                 const variable_name = `\${temp_text_${variableCounter++}}`; // Create a temporary variable
                  testCaseLines.push(`    ${variable_name} =    Get Text    ${locator}`);
-                 testCaseLines.push(`    Should Be Equal As Strings    ${variable_name}    ${haveTextMatch[1]}`);
+                 testCaseLines.push(`    Should Be Equal As Strings    ${variable_name}    "${haveTextMatch[1]}"`); // Ensure text is quoted
                  continue;
              }
 
@@ -337,7 +339,7 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
 
         // Handle page.goto()
         if (stripped_line.includes('.goto("')) {
-            writing_started = true;
+            writingStarted = true; // Corrected variable name
             if (!insideTestCase) { // If not explicitly in a test case, start a default one
                 testCaseLines.push("Default Converted Test Case");
                 insideTestCase = true;
@@ -364,7 +366,7 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
             continue;
         }
 
-        if (!writing_started) {
+        if (!writingStarted) { // Corrected variable name
             continue; // Don't process lines before the first goto
         }
 
@@ -441,9 +443,16 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
                  // General case with arguments
                  // Clean arguments: remove surrounding quotes for simple strings
                  if (method_args.startsWith('"') && method_args.endsWith('"')) {
-                     method_args = method_args.slice(1, -1);
+                     method_args = `"${method_args.slice(1, -1)}"`; // Keep quotes for Robot string args
                  } else if (method_args.startsWith("'") && method_args.endsWith("'")) {
-                      method_args = method_args.slice(1, -1);
+                      method_args = `"${method_args.slice(1, -1)}"`; // Keep quotes for Robot string args
+                 } else if (!method_args.startsWith('"') && !method_args.startsWith("'")) {
+                     // If args are not quoted, assume they are variables or numbers, don't add quotes
+                     // Or if it's a complex object string like "{ key: 'value' }", keep as is (may need manual adjustment)
+                     // If it's intended as a simple string without quotes in Playwright, add them for Robot
+                     if (!/^\d+(\.\d+)?$/.test(method_args) && !method_args.startsWith('${') && !method_args.startsWith('{')) {
+                        method_args = `"${method_args}"`;
+                     }
                  }
                   // Handle potential complex arguments (objects, multiple args) - may need manual refinement
                   // For now, pass the cleaned args string directly
@@ -479,52 +488,29 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
 
 // --- Server Action ---
 
-const FormSchema = zod.object({
-  mappingFile: zod.string().min(1, 'Mapping file path is required.')
-     .refine(async (value) => {
-        try {
-            await fs.access(value, fs.constants.R_OK); // Check read access
-            return true;
-        } catch {
-            return false;
-        }
-     }, { message: "Mapping file not found or not readable." }),
-  inputFileOrFolder: zod.string().min(1, 'Input file/folder path is required.')
-      .refine(async (value) => {
-        try {
-            await fs.access(value, fs.constants.R_OK); // Check read access
-            return true;
-        } catch {
-            return false;
-        }
-      }, { message: "Input file or folder not found or not readable." }),
-  isSingleFile: zod.boolean().default(false).optional(),
-  outputFolder: zod.string().min(1, 'Output folder path is required.')
-       .refine(async (value) => {
-        try {
-            // Attempt to get stats. If it fails because it doesn't exist, it's *potentially* okay
-            // if the parent directory exists and we can create it.
-            // However, for simplicity here, we check if it *exists* and is a *directory*.
-            // A more robust check would verify write permissions in the parent if it doesn't exist.
-            const stats = await fs.stat(value);
-            return stats.isDirectory();
-        } catch (error: any) {
-             if (error.code === 'ENOENT') {
-                // Check if parent directory exists and is writable
-                const parentDir = path.dirname(value);
-                try {
-                    await fs.access(parentDir, fs.constants.W_OK);
-                    return true; // Parent exists and is writable, so output dir can be created
-                } catch {
-                    return false; // Parent doesn't exist or isn't writable
-                }
-            }
-            return false; // Other error (e.g., not a directory)
-        }
-       }, { message: "Output folder is not a valid directory or cannot be created." }),
+// Define Zod schema for FormData
+// Use z.instanceof(File) for file uploads
+const FileValidationSchema = zod.instanceof(File)
+  .refine((file) => file.size > 0, { message: "File cannot be empty." });
+
+const MappingFileSchema = FileValidationSchema
+    .refine((file) => file.name.endsWith('.xlsx'), { message: "Mapping file must be an .xlsx file." });
+
+const PythonFileSchema = FileValidationSchema
+    .refine((file) => file.name.endsWith('.py'), { message: "Input file must be a Python (.py) file." });
+
+const FormDataSchema = zod.object({
+  mappingFile: MappingFileSchema,
+  // Accept either a single file or multiple files (for folder upload simulation)
+  inputFiles: zod.union([PythonFileSchema, zod.array(PythonFileSchema).min(1, 'At least one input file is required.')]),
+  isSingleFile: zod.string().transform(val => val === 'true').pipe(zod.boolean()), // Checkbox value comes as string 'true'/'false'
+  // outputFolder is no longer needed and removed from schema
 });
 
-type FormValues = zod.infer<typeof FormSchema>;
+
+// Type for the validated FormData structure
+type ValidatedFormData = zod.infer<typeof FormDataSchema>;
+
 
 interface ConversionResult {
   success: boolean;
@@ -536,90 +522,82 @@ interface ConversionResult {
 }
 
 
-async function performConversion(data: FormValues): Promise<ConversionResult> {
-    console.log("Starting conversion with data:", data);
-    const { mappingFile, inputFileOrFolder, isSingleFile, outputFolder } = data;
-    const tempDir = path.join(os.tmpdir(), `conversion_${Date.now()}`); // Unique temp directory
+async function performConversion(data: ValidatedFormData): Promise<ConversionResult> {
+    console.log("Starting conversion with validated data:", data);
+    const { mappingFile, inputFiles, isSingleFile } = data;
+    // const tempDir = path.join(os.tmpdir(), `conversion_${Date.now()}`); // No longer need temp dir for file writes
 
     try {
-         // 0. Create temporary directory for output files before zipping
-         await fs.mkdir(tempDir, { recursive: true });
+         // 0. No need to create temp directory anymore
 
-        // 1. Load Mapping
-        const mapping = await loadMappingFromExcel(mappingFile);
+        // 1. Load Mapping from File Buffer
+        const mappingFileBuffer = Buffer.from(await mappingFile.arrayBuffer());
+        const mapping = await loadMappingFromExcel(mappingFileBuffer, mappingFile.name);
         if (Object.keys(mapping).length === 0) {
-            return { success: false, error: 'Mapping file is empty or invalid.' };
+            return { success: false, error: `Mapping file "${mappingFile.name}" is empty or invalid.` };
         }
 
-        const inputSourceName = path.basename(inputFileOrFolder);
-        const outputBaseName = inputSourceName.replace(/\.py$|\/$|\\$/, ''); // Remove .py extension or trailing slash
-
-
         if (isSingleFile) {
+             if (!(inputFiles instanceof File)) {
+                return { success: false, error: 'Input is marked as single file, but multiple files were provided.' };
+            }
             // --- Single File Conversion ---
-            const inputFile = inputFileOrFolder;
-             const stats = await fs.stat(inputFile);
-             if (!stats.isFile()) {
-                 return { success: false, error: `Input path "${inputSourceName}" is not a file.` };
-             }
-             if (!inputFile.endsWith('.py')) {
-                 return { success: false, error: `Input file "${inputSourceName}" must be a Python (.py) file.` };
-             }
-
+            const inputFile = inputFiles; // It's a single File object
+            const inputFileName = inputFile.name;
+            const outputBaseName = inputFileName.replace(/\.py$/, ''); // Remove .py extension
             const outputFileName = `${outputBaseName}_converted.robot`;
-            const tempOutputPath = path.join(tempDir, outputFileName); // Save to temp dir first
 
-            console.log(`Converting single file: ${inputFile} to ${tempOutputPath}`);
+            console.log(`Converting single file: ${inputFileName}`);
 
-            const pythonCode = await fs.readFile(inputFile, 'utf-8');
+            const pythonCodeBuffer = Buffer.from(await inputFile.arrayBuffer());
+            const pythonCode = pythonCodeBuffer.toString('utf-8');
             const robotCode = convertSinglePlaywrightCode(pythonCode, mapping);
-
-             // Save the converted file temporarily (optional, could hold in memory)
-             // await fs.writeFile(tempOutputPath, robotCode, 'utf-8');
-             // console.log(`Saved temporary file: ${tempOutputPath}`);
-
 
              return {
                  success: true,
-                 message: `Successfully converted file ${inputSourceName}. Output file is ready for download.`,
+                 message: `Successfully converted file ${inputFileName}. Output file is ready for download.`,
                  fileName: outputFileName,
                  fileContent: robotCode, // Return content directly
              };
 
         } else {
-             // --- Folder Conversion ---
-             const inputFolder = inputFileOrFolder;
-              const stats = await fs.stat(inputFolder);
-             if (!stats.isDirectory()) {
-                 return { success: false, error: `Input path "${inputSourceName}" is not a directory.` };
+             if (!Array.isArray(inputFiles)) {
+                 return { success: false, error: 'Input is marked as folder, but only a single file was provided.' };
              }
+             // --- Folder Conversion ---
+             const inputFolderFiles = inputFiles; // It's an array of File objects
+             const inputFolderName = inputFolderFiles[0]?.webkitRelativePath?.split('/')[0] || 'python_files'; // Guess folder name
+             const outputBaseName = inputFolderName;
+             const outputZipFileName = `${outputBaseName}_robot_files.zip`;
 
-            console.log(`Converting folder: ${inputFolder}`);
-            const files = await fs.readdir(inputFolder);
-            const pythonFiles = files.filter(f => f.endsWith('.py'));
+            console.log(`Converting folder (simulated): ${inputFolderName}`);
 
-            if (pythonFiles.length === 0) {
-                return { success: false, error: `No Python (.py) files found in folder "${inputSourceName}".` };
+            if (inputFolderFiles.length === 0) {
+                return { success: false, error: `No Python (.py) files provided for folder conversion.` };
             }
 
-            const outputZipFileName = `${outputBaseName}_robot_files.zip`;
              const zip = new AdmZip();
 
-            for (const pyFile of pythonFiles) {
-                const inputFile = path.join(inputFolder, pyFile);
-                const outputFileName = pyFile.replace(/\.py$/, '_converted.robot');
-                 const tempOutputPath = path.join(tempDir, outputFileName); // Output to temp dir
+            for (const pyFile of inputFolderFiles) {
+                 if (!pyFile.name.endsWith('.py')) {
+                    console.warn(`Skipping non-python file in folder upload: ${pyFile.name}`);
+                    continue; // Skip non-python files if included
+                 }
+
+                const inputFileBaseName = pyFile.name;
+                const outputFileName = inputFileBaseName.replace(/\.py$/, '_converted.robot');
 
                 try {
-                    const pythonCode = await fs.readFile(inputFile, 'utf-8');
+                    const pythonCodeBuffer = Buffer.from(await pyFile.arrayBuffer());
+                    const pythonCode = pythonCodeBuffer.toString('utf-8');
                     const robotCode = convertSinglePlaywrightCode(pythonCode, mapping);
-                     await fs.writeFile(tempOutputPath, robotCode, 'utf-8'); // Write file to temp dir
-                     zip.addLocalFile(tempOutputPath, '', outputFileName); // Add file from temp dir to zip root
-                    console.log(`Converted and added to zip: ${pyFile} -> ${outputFileName}`);
+                     // Add generated robot code directly to zip from buffer
+                     zip.addFile(outputFileName, Buffer.from(robotCode, 'utf-8'));
+                    console.log(`Converted and added to zip: ${inputFileBaseName} -> ${outputFileName}`);
                 } catch (fileError: any) {
-                    console.error(`Error converting file ${pyFile}: ${fileError.message}`);
-                     // Optionally, add an error marker to the zip or return a partial success
-                     zip.addFile(`${outputFileName}.ERROR.txt`, Buffer.from(`Failed to convert ${pyFile}: ${fileError.message}\n`, 'utf-8'));
+                    console.error(`Error converting file ${inputFileBaseName}: ${fileError.message}`);
+                     // Optionally, add an error marker to the zip
+                     zip.addFile(`${outputFileName}.ERROR.txt`, Buffer.from(`Failed to convert ${inputFileBaseName}: ${fileError.message}\n`, 'utf-8'));
                 }
             }
 
@@ -629,7 +607,7 @@ async function performConversion(data: FormValues): Promise<ConversionResult> {
 
             return {
                 success: true,
-                message: `Successfully converted folder ${inputSourceName}. Output zip archive is ready for download.`,
+                message: `Successfully converted folder ${inputFolderName}. Output zip archive is ready for download.`,
                 fileName: outputZipFileName,
                 zipBuffer: zipBuffer, // Return zip buffer
             };
@@ -638,31 +616,66 @@ async function performConversion(data: FormValues): Promise<ConversionResult> {
         console.error('Conversion process error:', error);
         return { success: false, error: `Conversion failed: ${error.message}` };
     } finally {
-        // Clean up temporary directory
-        try {
-            await fs.rm(tempDir, { recursive: true, force: true });
-            console.log(`Cleaned up temporary directory: ${tempDir}`);
-        } catch (cleanupError: any) {
-            console.error(`Error cleaning up temporary directory ${tempDir}: ${cleanupError.message}`);
-        }
+        // No temp directory cleanup needed
     }
 }
 
 
-export async function convertCode(rawData: unknown): Promise<ConversionResult> {
-    // Validate input data using the schema
-    const validationResult = await FormSchema.safeParseAsync(rawData); // Use async validation
+// Server action now accepts FormData
+export async function convertCode(formData: FormData): Promise<ConversionResult> {
+
+     // --- Data Extraction from FormData ---
+     const mappingFile = formData.get('mappingFile') as File | null;
+     const isSingleFileValue = formData.get('isSingleFile') as string | null; // 'true' or 'false'
+     const isSingleFile = isSingleFileValue === 'true';
+     let inputFiles: File | File[] | null = null;
+
+     if (isSingleFile) {
+         inputFiles = formData.get('inputFileOrFolder') as File | null;
+     } else {
+         // When multiple files are selected (directory upload), they might come as multiple entries
+         // with the *same name* ('inputFileOrFolder') or might need specific handling based on browser.
+         // Using getAll() is generally safer for potential multiple file uploads.
+         const allInputFiles = formData.getAll('inputFileOrFolder') as File[];
+         inputFiles = allInputFiles.length > 0 ? allInputFiles : null; // Store as array
+     }
+
+
+     // --- Manual Basic Validation (Before Zod) ---
+     if (!mappingFile) return { success: false, error: "Mapping file is missing." };
+     if (!inputFiles) return { success: false, error: "Input file(s) are missing." };
+     if (isSingleFile && Array.isArray(inputFiles)) return { success: false, error: "Expected a single input file, but received multiple."};
+     if (!isSingleFile && !Array.isArray(inputFiles)) return { success: false, error: "Expected multiple input files (folder), but received single."};
+
+
+    // --- Zod Validation ---
+    // Construct the object Zod expects
+    const dataToValidate = {
+      mappingFile: mappingFile,
+      inputFiles: inputFiles, // Pass the single File or Array<File>
+      isSingleFile: isSingleFileValue || 'false', // Pass the string value for Zod to transform
+    };
+
+
+    const validationResult = FormDataSchema.safeParse(dataToValidate);
+
     if (!validationResult.success) {
-       console.error("Server-side validation failed:", validationResult.error.errors);
-      // Combine multiple validation errors into a single message
-      const errorMessages = validationResult.error.errors.map(e => `${e.path.join('.') || 'field'}: ${e.message}`).join('; ');
-      return { success: false, error: `Invalid input: ${errorMessages}` };
+       console.error("Server-side FormData validation failed:", validationResult.error.errors);
+       const errorMessages = validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+       // Modify error messages to be more user-friendly and match the screenshot
+       const userFriendlyErrors = validationResult.error.errors.map(e => {
+           if (e.path.includes('mappingFile')) return 'Mapping file not found or not readable.';
+           if (e.path.includes('inputFiles')) return 'Input file or folder not found or not readable.';
+           // Add more specific messages if needed
+           return `${e.path.join('.')}: ${e.message}`;
+       }).join('; ');
+       return { success: false, error: `Invalid input: ${userFriendlyErrors}` };
     }
 
     const validatedData = validationResult.data;
 
+    // --- Perform Conversion ---
     try {
-      // Call the actual conversion logic
       const result = await performConversion(validatedData);
       return result;
     } catch (error) {
