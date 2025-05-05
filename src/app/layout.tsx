@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Roboto } from 'next/font/google'; // Import Roboto
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster'; // Import Toaster
-import { ThemeProvider } from '@/components/theme-provider'; // Import ThemeProvider
 
 const roboto = Roboto({
   weight: ['400', '500', '700'], // Specify weights needed
@@ -21,18 +20,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    // Apply 'dark' class directly to html for permanent dark mode
+    // Removed suppressHydrationWarning as ThemeProvider is removed
+    <html lang="en" className="dark">
       <body className={`${roboto.variable} antialiased`}>
         {' '}
-        {/* Apply font variable and fallback, removed font-sans */}
-        <ThemeProvider
-          attribute="class"
-          forcedTheme="dark" // Force dark theme
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster /> {/* Add Toaster component here */}
-        </ThemeProvider>
+        {/* Apply font variable and fallback */}
+        {/* ThemeProvider removed */}
+        {children}
+        <Toaster /> {/* Add Toaster component here */}
       </body>
     </html>
   );

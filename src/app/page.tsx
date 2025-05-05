@@ -2,17 +2,17 @@
 
 import type React from 'react';
 import { useState, useEffect, useRef, type SubmitHandler } from 'react'; // Added type SubmitHandler
-import { useForm } from 'react-hook-form'; // Removed FormProvider as it's now directly in form component
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
 import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Mail, Loader2, Sun, Moon, Upload, AlertTriangle } from 'lucide-react'; // Keep Mail for potential future use, remove Sun/Moon
+import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Loader2, Upload, AlertTriangle } from 'lucide-react'; // Removed Mail, Sun, Moon
 import { useToast } from '@/hooks/use-toast';
 import { convertCode, getSheetNames } from './actions'; // Import server actions
-import { useTheme } from 'next-themes';
+// Removed useTheme import
 // Removed Switch import as it's no longer used
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -81,7 +81,6 @@ export default function Home() {
   const [progressValue, setProgressValue] = useState(0); // State for progress bar
   const [isMounted, setIsMounted] = useState(false); // State to track client mount
   const { toast } = useToast();
-  // Removed theme from useTheme as it's no longer needed for image switching
 
   // File input refs
   const mappingFileInputRef = useRef<HTMLInputElement>(null);
@@ -141,7 +140,7 @@ export default function Home() {
               toast({
                   title: 'No Sheets Found',
                   description: 'The Excel file does not contain any sheets.',
-                  variant: 'warning',
+                  variant: 'warning', // Use warning variant
               });
             }
           } else {
@@ -265,7 +264,7 @@ export default function Home() {
               toast({
                 title: "No Python Files Found",
                 description: "The selected folder contains no Python (.py) files.",
-                variant: "warning",
+                variant: "warning", // Use warning variant
               });
               form.setValue(fieldName, undefined, { shouldValidate: true });
          } else {
@@ -368,6 +367,7 @@ export default function Home() {
          toast({
            title: 'Conversion Successful',
            description: `${result.message || 'Starting download...'}`,
+           variant: "default", // Use default variant for success
          });
          if (result.fileContent) {
            triggerDownload(result.fileName, result.fileContent);
@@ -410,12 +410,10 @@ export default function Home() {
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
         const target = e.target as HTMLImageElement;
         // Prevent logging errors for the placeholder itself
-        if (target.src !== darkLogoPlaceholder) {
+        if (target.src !== darkLogoPlaceholder && !target.src.includes('data:image')) { // Check if not already placeholder or data URI
             console.error(`Image failed to load: ${target.src}`);
-            // Fallback to a placeholder if the intended image fails and it's not already the placeholder
-             if (imageSrc !== darkLogoPlaceholder) {
-                setImageSrc(darkLogoPlaceholder);
-             }
+            // Fallback to a placeholder if the intended image fails
+            setImageSrc(darkLogoPlaceholder);
         }
     };
 
@@ -441,15 +439,11 @@ export default function Home() {
                         style={{ opacity: 1 }} // Always show when mounted
                         priority // Prioritize logo loading
                         data-ai-hint="abstract logo"
-                        onError={handleImageError}
+                        onError={handleImageError} // Use defined error handler
                     />
                  ) : (
                     // Static placeholder during SSR/initial mount
                     <div role="status" aria-label="Loading logo..." className="h-[240px] w-[240px] bg-muted/20 rounded-lg shadow-lg animate-pulse"></div>
-                )}
-                {/* Optional: Loading skeleton overlay */}
-                {(isLoading || !isMounted) && ( // Show skeleton during loading or if not mounted
-                    <div role="status" aria-label="Loading logo..." className="absolute inset-0 bg-muted/20 rounded-lg shadow-lg animate-pulse z-10"></div>
                 )}
            </div>
         </div>
@@ -459,6 +453,7 @@ export default function Home() {
       <Card className="w-full max-w-2xl shadow-xl backdrop-blur-[28px] bg-card/5 dark:bg-card/[0.03] border border-border/10 rounded-2xl overflow-hidden">
         {/* Applied 97% blur via backdrop-blur-[28px] approx */}
         <CardContent className="pt-6 px-6 sm:px-8">
+          {/* FormProvider removed, use Form from react-hook-form directly */}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
