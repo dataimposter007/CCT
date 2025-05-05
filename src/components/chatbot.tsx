@@ -21,10 +21,11 @@ interface Message {
 
 type ChatState = 'initial' | 'awaiting_choice' | 'awaiting_feedback' | 'processing_feedback' ; // Removed interaction_complete
 
+// Updated initial bot message
 const initialBotMessage: Message = {
     id: 0,
     sender: 'bot',
-    text: "Hi there! How can I help you today? Please choose an option:",
+    text: "How can I help you today?",
     showButtons: true, // Show buttons with the initial message
 };
 
@@ -36,38 +37,37 @@ interface ChoiceButtonsProps {
 }
 const ChoiceButtons: React.FC<ChoiceButtonsProps> = ({ onChoice, disabled }) => {
     return (
-        // Use flex-wrap to allow buttons to wrap onto the next line if needed
-        // Reduced gap slightly, adjusted padding for better fit
-        <div className="flex flex-wrap gap-1.5 mt-2">
+        // Use flex-col for vertical alignment, w-full for full width buttons
+        <div className="flex flex-col gap-2 mt-2 w-full">
             <Button
                 variant="outline"
                 size="sm"
-                // Adjusted padding and text size slightly
-                className="flex-grow sm:flex-grow-0 justify-start text-left h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
+                // Use w-full for full width
+                className="w-full justify-start text-left h-auto py-1.5 px-3 text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
                 onClick={() => onChoice('rf')}
                 disabled={disabled}
             >
-                <HelpCircle className="w-3.5 h-3.5 mr-1.5 text-primary/80" />
+                <HelpCircle className="w-4 h-4 mr-2 text-primary/80" />
                 Robot Framework queries
             </Button>
             <Button
                 variant="outline"
                 size="sm"
-                className="flex-grow sm:flex-grow-0 justify-start text-left h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
+                className="w-full justify-start text-left h-auto py-1.5 px-3 text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
                 onClick={() => onChoice('website')}
                 disabled={disabled}
             >
-                <MessageSquareWarning className="w-3.5 h-3.5 mr-1.5 text-primary/80" />
+                <MessageSquareWarning className="w-4 h-4 mr-2 text-primary/80" />
                 Website related issues
             </Button>
             <Button
                 variant="outline"
                 size="sm"
-                className="flex-grow sm:flex-grow-0 justify-start text-left h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
+                className="w-full justify-start text-left h-auto py-1.5 px-3 text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
                 onClick={() => onChoice('feedback')}
                 disabled={disabled}
             >
-                <Mail className="w-3.5 h-3.5 mr-1.5 text-primary/80" />
+                <Mail className="w-4 h-4 mr-2 text-primary/80" />
                 Suggest updates/feedback
             </Button>
         </div>
@@ -305,7 +305,7 @@ export default function Chatbot() {
                 >
                   {message.text}
                 </div>
-                 {/* Render buttons if the flag is set */}
+                 {/* Render buttons if the flag is set and sender is bot */}
                 {message.sender === 'bot' && message.showButtons && (
                     <ChoiceButtons onChoice={handleChoice} disabled={isLoading} />
                 )}
