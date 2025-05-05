@@ -787,8 +787,8 @@ export async function convertCode(formData: FormData): Promise<ConversionResult>
 export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
   console.log(`Handling message: "${input.message}"`);
   if (!process.env.GOOGLE_GENAI_API_KEY) {
-    console.error('MISSING API KEY: The GOOGLE_GENAI_API_KEY environment variable is not set.');
-    return 'Sorry, the chatbot is not configured correctly. Missing API key.';
+    console.error('MISSING API KEY: The GOOGLE_GENAI_API_KEY environment variable is not set. Ensure it is configured in your .env file.');
+    return 'Sorry, the chatbot is not configured correctly (missing API key). Please check the server setup or contact support.';
   }
 
   try {
@@ -820,4 +820,3 @@ export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
   }
 }
 
-    
