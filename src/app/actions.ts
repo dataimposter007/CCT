@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import * as zod from 'zod';
 import * as xlsx from 'xlsx';
 import AdmZip from 'adm-zip';
+import { chatFlow, type ChatFlowInput } from '@/ai/flows/chat-flow'; // Import chat flow
 
 // --- Translated Helper Functions (from Python logic) ---
 
@@ -250,25 +251,20 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
     let lines: string[] = []; // Processed lines (handling page.once etc.)
 
     // Pre-processing loop (handle page.once as per Python logic)
-    rawLines.forEach(line => {
-        const stripped = line.trim();
-        if (stripped.startsWith("page.once")) {
-            // Python example translation: waits for alert and accepts
-             // Note: The Robot Framework equivalent might need context depending on the action in page.once
-             // This is a specific translation based on the python example provided
-             if (stripped.includes('lambda dialog: dialog.dismiss())') || stripped.includes('lambda dialog: dialog.accept())')) {
-                 const action = stripped.includes('dismiss') ? 'dismiss' : 'accept';
-                 // Placeholder for the user to fill in the specific alert text if needed for assertion
-                lines.push('${promise} =       Promise To    Wait For Alert    action=' + action + '   # text=<text content of alert box if you want to assert>');
-                // Placeholder comment reminding the user to add the action that triggers the alert
-                lines.push('# <Line which triggers the alert action> ex: Click <button selector>');
-             } else {
-                 lines.push(line); // Keep other page.once lines if they don't match the dismiss/accept pattern
-             }
-        } else {
-            lines.push(line);
-        }
-    });
+     rawLines.forEach(line => {
+         const stripped = line.trim();
+        // Handle page.once specific dismissal/acceptance
+        if (stripped.startsWith("page.once(\"dialog\"") && stripped.endsWith("lambda dialog: dialog.dismiss())")) {
+             lines.push('${promise} =       Promise To    Wait For Alert    action=dismiss');
+             lines.push('# <Line which triggers the alert action> ex: Click <button selector>');
+         } else if (stripped.startsWith("page.once(\"dialog\"") && stripped.endsWith("lambda dialog: dialog.accept())")) {
+             lines.push('${promise} =       Promise To    Wait For Alert    action=accept   # text=<text content of alert box if you want to assert>');
+             lines.push('# <Line which triggers the alert action> ex: Click <button selector>');
+         } else {
+             // Keep other lines, including potentially other page.once uses
+             lines.push(line);
+         }
+     });
 
 
     // Main conversion loop
@@ -287,50 +283,45 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
 
         // Handle expect(...) assertions
         if (stripped_line.startsWith("expect(")) {
-            // Extract locator using regex
-            const locatorMatch = stripped_line.match(/expect\((.*?)\)\./); // Get content inside expect()
-             if (!locatorMatch) continue;
+            // Extract locator using regex - simplified approach
+            // Look for common patterns like page.locator, get_by_*
+            let locatorMatch = stripped_line.match(/expect\((?:page\.)?(locator|get_by_.*?)\(['"](.*?)['"](?:,.*?)?\)\)/);
+            let rfLocator = "";
+            if (locatorMatch && locatorMatch[2]) {
+                rfLocator = extractLocator(locatorMatch[2]); // Extract the core selector
+            } else {
+                // If a standard locator pattern isn't found inside expect(), try a broader match
+                const fallbackLocatorMatch = stripped_line.match(/expect\((.*?)\)/);
+                if (fallbackLocatorMatch && fallbackLocatorMatch[1]) {
+                     // Try to extract from the inner content if it looks like a simple selector
+                     const innerContent = fallbackLocatorMatch[1].trim();
+                     // Basic check if it might be a selector (e.g., starts with #, ., " or ')
+                     if (innerContent.match(/^['"#.]/) || innerContent.includes('=')) {
+                        rfLocator = extractLocator(innerContent);
+                     } else {
+                        console.warn(`Could not reliably extract locator from expect(): ${stripped_line}. Skipping assertion.`);
+                        continue; // Skip this line if locator extraction fails
+                     }
+                } else {
+                     console.warn(`Could not parse expect() statement: ${stripped_line}. Skipping.`);
+                     continue; // Skip if expect() content is not parseable
+                }
+            }
 
-             const expectContent = locatorMatch[1].trim();
-            let locatorSource = expectContent; // The part containing the locator (e.g., page.locator("#id"))
-
-            // Check for common assertion types
-            const textAssertionMatch = stripped_line.match(/\.to_contain_text\(['"](.*?)['"]\)/) || stripped_line.match(/\.to_have_text\(['"](.*?)['"]\)/);
+            // Check for assertion types
+            const textAssertionMatch = stripped_line.match(/\.to_(?:contain|have)_text\(['"](.*?)['"](?:,.*)?\)/);
             const visibilityAssertionMatch = stripped_line.match(/\.to_be_visible\(\)/);
 
-            let rfLocator = "";
-             // Try to extract locator from common Playwright patterns within expect()
-             let pwLocatorMatch = expectContent.match(/locator\(['"](.*?)['"]\)/) || expectContent.match(/get_by_.*?\(['"](.*?)['"](?:,\s*.*?)*\)/);
-            if (pwLocatorMatch && pwLocatorMatch[1]) {
-                 locatorSource = pwLocatorMatch[0]; // Use the full locator part like locator("...")
-                 rfLocator = extractLocator(pwLocatorMatch[1]); // Extract the core selector
-             } else if (expectContent.startsWith('page.')) {
-                 // Handle cases like expect(page.locator(...)) where the locator is the whole content
-                 const simpleLocatorMatch = expectContent.match(/page\.(locator|get_by_.*)\(['"](.*?)['"](?:,.*)*\)/);
-                 if (simpleLocatorMatch && simpleLocatorMatch[2]) {
-                     rfLocator = extractLocator(simpleLocatorMatch[2]);
-                 } else {
-                     // Fallback if locator extraction inside expect is complex/unrecognized
-                     rfLocator = `"${expectContent}"`; // Quote the whole thing as a potential selector
-                 }
-             } else {
-                  // If it's not clearly a page.locator or page.get_by_, treat the content as a potential direct selector
-                  rfLocator = extractLocator(expectContent);
-             }
-
-            // --- Generate RF steps based on assertion type ---
+            // Generate RF steps based on assertion type
             if (textAssertionMatch) {
-                 const expectedText = textAssertionMatch[1];
-                 // Use Get Text for assertion
-                 testCaseLines.push(`Get Text    ${rfLocator}    ==    ${expectedText}`);
-             } else if (visibilityAssertionMatch) {
-                  // Use Wait For Elements State for visibility check
-                  testCaseLines.push(`Wait For Elements State    ${rfLocator}    visible    timeout=10s`);
-             } else {
-                 // Generic fallback for other expect() types - maybe a simple visibility check
-                 console.warn(`Unsupported expect() assertion type: ${stripped_line}. Adding generic visibility check.`);
-                 testCaseLines.push(`Wait For Elements State    ${rfLocator}    visible    timeout=10s`);
-             }
+                const expectedText = textAssertionMatch[1];
+                testCaseLines.push(`    Get Text    ${rfLocator}    ==    ${expectedText}`);
+            } else if (visibilityAssertionMatch) {
+                testCaseLines.push(`    Wait For Elements State    ${rfLocator}    visible    timeout=10s`);
+            } else {
+                console.warn(`Unsupported assertion type in expect(): ${stripped_line}. Adding generic visibility check.`);
+                testCaseLines.push(`    Wait For Elements State    ${rfLocator}    visible    timeout=10s`); // Fallback check
+            }
             continue; // Move to next line
         }
 
@@ -353,17 +344,16 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
              }
 
              if (firstGoto) {
-                 // Add Test Case name and setup steps only on the *first* goto
-                 testCaseLines.push("Converted Test Case"); // Default Test Case Name
-                 // RF Browser library keywords for setup
-                 testCaseLines.push(`New Browser        ${variableLines.includes('${BROWSER}') ? '${BROWSER}' : 'firefox'}        headless=False`); // Use defined browser or default
-                 testCaseLines.push(`New Context        viewport={'width': 1920, 'height': 1080}`); // Default viewport
-                 testCaseLines.push(`New Page            ${var_name}`); // Use the URL variable
-                 firstGoto = false; // Mark that setup is done
-             } else {
-                 // Subsequent navigations use the Go To keyword
-                 testCaseLines.push(`Go To    ${var_name}`);
-             }
+                  // RF Test Case definition and setup keywords
+                  testCaseLines.push("Converted Test Case"); // Use a default name or extract from filename later
+                  testCaseLines.push(`    New Browser        ${variableLines.includes('${BROWSER}') ? '${BROWSER}' : 'firefox'}        headless=False`); // Use configured or default browser
+                  testCaseLines.push(`    New Context        viewport={'width': 1920, 'height': 1080}`); // Default viewport
+                  testCaseLines.push(`    New Page            ${var_name}`); // Open the first page
+                  firstGoto = false; // Mark setup as done
+              } else {
+                  // Subsequent navigations use the Go To keyword
+                  testCaseLines.push(`    Go To    ${var_name}`);
+              }
              continue; // Move to next line
          }
 
@@ -374,160 +364,134 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
 
         // Handle browser.close() -> Add RF Close Browser step
         if (stripped_line.startsWith("browser.close")) {
-             testCaseLines.push("Close Browser");
-             // Consider stopping processing here if browser.close() implies the end
-             // writing_started = false; // Python code implies stopping processing after browser.close
-             // Let's allow context.close() to handle final teardown for robustness
+             testCaseLines.push("    Close Browser");
+             // Let context.close() handle final teardown or add Close Context if needed
              continue;
         }
 
 
         // --- General command processing (page.click, page.fill, etc.) ---
-        // Split the line by '.' respecting quotes (e.g., page.locator("a.b").click())
         const parts = safeSplitOutsideQuotes(stripped_line, '.');
-        const commandParts = parts.map(part => part.trim()).filter(part => part); // Clean up parts
+        const commandParts = parts.map(part => part.trim()).filter(part => part);
 
-        if (commandParts.length < 1) {
-            continue; // Skip if parts are empty
-        }
+        if (commandParts.length < 1) continue;
 
-        // Identify the method call (last part) and potential locator chain (parts before the method)
-        const methodPart = commandParts[commandParts.length - 1]; // e.g., 'click()' or 'fill("text")'
-        // Locator chain excludes the first part (page/context) and the last (method)
-        const locatorChainParts = commandParts.slice(1, -1); // e.g., ['locator("#id")', 'first']
+        const methodPart = commandParts[commandParts.length - 1];
+        const locatorChainParts = commandParts.slice(1, -1);
 
-        // Extract method name and arguments
-        const methodMatch = methodPart.match(/^([a-zA-Z_]+)\((.*)\)$/); // Matches 'methodName(arguments)'
+        const methodMatch = methodPart.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
         if (methodMatch) {
-            const methodNameOnly = methodMatch[1]; // e.g., 'click'
-            const methodSignature = `${methodNameOnly}()`; // e.g., 'click()' - used for mapping lookup
-            let methodArgsRaw = methodMatch[2]?.trim() ?? ''; // e.g., '"#id"' or '"text", options'
+            const methodNameOnly = methodMatch[1];
+            const methodSignature = `${methodNameOnly}()`; // Use '()' for mapping lookup
+            let methodArgsRaw = methodMatch[2]?.trim() ?? '';
 
-            // Find the corresponding Robot Framework keyword using the mapping
             const transformedMethod = findNearestMatch(methodSignature, mapping);
 
-            // --- Locator Extraction ---
+            // --- Locator Extraction from chain or args ---
             let rfLocator = "";
-            // If there's a locator chain (e.g., page.locator(...).first.click())
             if (locatorChainParts.length > 0) {
-                // Prioritize extracting locator from the first element in the chain, which is common
-                 const primaryLocatorPart = locatorChainParts[0]; // e.g., 'locator("#id")' or 'get_by_role("button")'
-                 const extracted = extractLocator(primaryLocatorPart); // Try to extract from known patterns
-                 if (extracted !== `"${primaryLocatorPart}"` || primaryLocatorPart.includes('locator(') || primaryLocatorPart.includes('get_by')) {
-                      rfLocator = extracted;
-                 } else {
-                      // If extraction didn't yield a standard locator, fallback to quoting the whole part
-                      rfLocator = `"${primaryLocatorPart}"`;
-                 }
-                 // Note: Handling complex chains like .first, .nth(0) might require more specific logic
-                 if (locatorChainParts.some(p => p === 'first')) {
-                     console.warn(`Playwright's '.first' detected. Robot Framework conversion might need manual adjustment for selector specificity. Using base locator: ${rfLocator}`);
+                // Extract from the first locator part in the chain
+                rfLocator = extractLocator(locatorChainParts[0]);
+                // Add warnings for complex chains if needed
+                if (locatorChainParts.some(p => p === 'first' || p.startsWith('nth'))) {
+                    console.warn(`Complex locator chain detected (.first, .nth). Verify RF selector: ${stripped_line}`);
+                }
+            } else if (methodArgsRaw) {
+                // Handle methods where the first arg is the locator (click, check, etc.)
+                 // Exclude methods that take data first (fill, type, press, select_option)
+                 const methodsTakingDataFirst = ['fill', 'type', 'press', 'select_option', 'goto', 'wait_for_timeout', 'evaluate'];
+                 if (!methodsTakingDataFirst.includes(methodNameOnly)) {
+                     // Assume the first argument might be the locator
+                     const firstArgMatch = methodArgsRaw.match(/^(['"].*?['"])/); // Match quoted string at the start
+                     if (firstArgMatch) {
+                         rfLocator = extractLocator(firstArgMatch[1]);
+                         // Remove the locator argument from methodArgsRaw if it was successfully extracted
+                         methodArgsRaw = methodArgsRaw.substring(firstArgMatch[0].length).replace(/^,\s*/, '').trim(); // Remove locator + potential comma
+                     } else {
+                          // If first arg isn't quoted, it might be a variable or complex expression - treat cautiously
+                           console.warn(`Potentially complex locator argument for ${methodNameOnly}: ${methodArgsRaw}. Manual review needed.`);
+                          // Decide if you want to attempt extraction or leave args as is
+                          // rfLocator = extractLocator(methodArgsRaw.split(',')[0].trim()); // Example: Attempt extraction anyway
+                          // methodArgsRaw = methodArgsRaw.substring(methodArgsRaw.split(',')[0].length).replace(/^,\s*/, '').trim();
+                     }
                  }
             }
-            // If no locator chain, check if the method arguments themselves contain a locator
-            // (Common for methods like click, fill if not using page.locator first)
-            else if (methodArgsRaw) {
-                  // Only treat args as locator if it's not a method that usually takes data first (like fill, type, select_option)
-                  const methodsTakingDataFirst = ['fill', 'type', 'press', 'select_option'];
-                  if (!methodsTakingDataFirst.includes(methodNameOnly.toLowerCase())) {
-                        const extracted = extractLocator(methodArgsRaw);
-                         // Check if extraction meaningfully changed the arg (e.g., added quotes, extracted #id)
-                         if (extracted !== `"${methodArgsRaw}"`) {
-                            rfLocator = extracted;
-                             methodArgsRaw = ""; // Args were consumed as locator
-                        } else {
-                           // If extractLocator just quoted it, it's likely not a standard locator argument for this method
-                           rfLocator = "";
-                        }
-                  }
-             }
-
 
             // --- Argument Handling & Formatting RF Line ---
-             let reformatted_line_parts: string[] = [transformedMethod]; // Start with the RF keyword
+            let reformatted_line_parts: string[] = [transformedMethod];
 
-             if (rfLocator) {
-                 reformatted_line_parts.push(rfLocator); // Add locator if found
-             }
+            if (rfLocator) {
+                reformatted_line_parts.push(rfLocator);
+            }
 
-             // Handle specific methods and their arguments based on Python logic
-             if (methodNameOnly === "select_option") {
+            if (methodNameOnly === "select_option") {
                  const args = methodArgsRaw.trim();
-                 // RF 'Select Options By' needs label/value/index specifier
-                 // Defaulting to 'Value' as per Python example
-                 reformatted_line_parts[0] = "Select Options By"; // Override keyword
+                 reformatted_line_parts[0] = "Select Options By"; // RF keyword change
                  if (!rfLocator) {
-                     console.error(`Missing locator for select_option: ${stripped_line}`);
-                     reformatted_line_parts.push('"MISSING_LOCATOR"'); // Add placeholder
+                     console.error(`Missing locator for select_option: ${stripped_line}. Using placeholder.`);
+                     reformatted_line_parts.push('"MISSING_LOCATOR"');
                  }
-                 reformatted_line_parts.push("Value"); // Add specifier
+                 reformatted_line_parts.push("Value"); // Assume 'Value' - adjust if needed based on PW args
 
-                 // Process args (handle list vs single value)
+                 // Handle list vs single value (more robustly)
                  if (args.startsWith("[") && args.endsWith("]")) {
-                      // Try parsing as JSON array (more robust)
-                      try {
-                         const parsedArgs = JSON.parse(args.replace(/'/g, '"')); // Replace single quotes for JSON
+                     try {
+                         // Convert Python-like list string to JSON array string
+                         const jsonArgs = args.replace(/'/g, '"');
+                         const parsedArgs = JSON.parse(jsonArgs);
                          if (Array.isArray(parsedArgs)) {
-                             // RF list variable format often uses multiple spaces as separator
-                             reformatted_line_parts.push(...parsedArgs.map(String)); // Add each value as separate arg
+                             reformatted_line_parts.push(...parsedArgs.map(String)); // Add each value
                          } else {
-                              reformatted_line_parts.push(args); // Fallback if not array
+                             reformatted_line_parts.push(args); // Fallback
                          }
-                      } catch {
-                          // Fallback for malformed list string
-                          reformatted_line_parts.push(args.slice(1, -1).replace(/['",\s]+/g, '    ')); // Heuristic split
-                      }
+                     } catch {
+                          // Fallback for simple split if JSON fails
+                          const items = args.slice(1, -1).split(',').map(item => item.trim().replace(/^['"]|['"]$/g, ''));
+                          reformatted_line_parts.push(...items);
+                     }
                  } else {
-                     // Single value, remove quotes if present
-                     reformatted_line_parts.push(args.replace(/^["']|["']$/g, ''));
+                     reformatted_line_parts.push(args.replace(/^['"]|['"]$/g, '')); // Single value
                  }
-
              } else if (methodArgsRaw) {
-                 // General case: Add remaining arguments, cleaning outer quotes
-                 const cleanedArgs = methodArgsRaw.split(',').map(arg => arg.trim().replace(/^["'](.*)["']$/, '$1'));
-                  reformatted_line_parts.push(...cleanedArgs);
+                 // Add remaining args, split by comma, trim, remove outer quotes
+                 const remainingArgs = methodArgsRaw.split(',')
+                     .map(arg => arg.trim().replace(/^['"]|['"]$/g, ''))
+                     .filter(arg => arg !== ''); // Remove empty strings
+                  reformatted_line_parts.push(...remainingArgs);
              }
 
-             // Join parts with RF standard separator (4 spaces) and trim
-             testCaseLines.push(reformatted_line_parts.join('    ').trim());
+             testCaseLines.push("    " + reformatted_line_parts.join('    ').trim());
 
         } else {
-             // Fallback for lines that don't match the standard method call pattern
-             // Try to interpret as a simple keyword call, potentially with arguments joined by spaces
-             console.warn(`Line could not be parsed as standard method call: "${stripped_line}". Adding as raw parts.`);
-             testCaseLines.push(commandParts.join('    ')); // Join with RF separator
+             // Fallback for lines not matching method pattern (less common)
+             console.warn(`Line format not standard method call: "${stripped_line}". Adding as raw parts.`);
+             testCaseLines.push("    " + commandParts.join('    '));
         }
     }
 
-     // --- Teardown ---
-     // Add teardown steps based on whether context.close() was found or if conversion started
-     if (contextCloseFound) {
-         // If context.close() was explicitly found, add Close Context and Close Browser
-         testCaseLines.push("Close Context");
-         testCaseLines.push("Close Browser");
-     } else if (writingStarted) { // If conversion started (e.g., page.goto was found) but no explicit close
-         const lastStep = testCaseLines[testCaseLines.length - 1]?.trim();
-         // Add default teardown unless already closing context/browser
-         if (lastStep && !lastStep.startsWith('Close Context') && !lastStep.startsWith('Close Browser')) {
-             testCaseLines.push("Close Context");
-             testCaseLines.push("Close Browser");
-         }
-     }
+    // --- Teardown ---
+    if (contextCloseFound) {
+        testCaseLines.push("    Close Context");
+        testCaseLines.push("    Close Browser");
+    } else if (writingStarted) { // Add default teardown if conversion started but no explicit close found
+        const lastStep = testCaseLines[testCaseLines.length - 1]?.trim();
+        if (lastStep && !lastStep.startsWith('Close Context') && !lastStep.startsWith('Close Browser')) {
+            testCaseLines.push("    Close Context");
+            testCaseLines.push("    Close Browser");
+        }
+    }
 
 
-    // Combine all sections (Settings, Variables, Test Cases)
     const final_output_lines = [
         ...outputLines,
-        '', // Blank line separator
+        '',
         ...variableLines,
-        '', // Blank line separator
+        '',
         ...testCaseLines
     ];
 
     const final_output = final_output_lines.join('\n');
-
-    // Apply alignment formatting as the very last step
-    return alignRobotCode(final_output);
+    return alignRobotCode(final_output); // Apply alignment formatting
 }
 
 
@@ -772,4 +736,16 @@ export async function convertCode(formData: FormData): Promise<ConversionResult>
         }
       return { success: false, error: errorMessage };
     }
+}
+
+
+// --- Chatbot Action ---
+export async function handleChatMessage(input: ChatFlowInput): Promise<string> {
+  try {
+    const result = await chatFlow(input);
+    return result.answer;
+  } catch (error) {
+    console.error('Error handling chat message:', error);
+    return 'Sorry, I encountered an error. Please try again.';
+  }
 }

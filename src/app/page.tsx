@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { useForm, type SubmitHandler, FormProvider } from 'react-hook-form'; // Added FormProvider
+import { useForm, FormProvider } from 'react-hook-form'; // Added FormProvider
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
 import Image from 'next/image'; // Import next/image
@@ -19,6 +19,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import Link from 'next/link'; // Import Link for menu items
 import { Progress } from "@/components/ui/progress"; // Import Progress component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
+import Chatbot from '@/components/chatbot'; // Import Chatbot component
 
 
 // Define Zod schema for form validation
@@ -126,10 +127,10 @@ export default function Home() {
   const inputFilesInputRef = useRef<HTMLInputElement>(null);
 
   // Define logo paths relative to the public directory
-  const lightLogoPath = '/light.png';
-  // Use a placeholder or the light logo if dark logo isn't provided/doesn't exist
-  const darkLogoPath = '/light.png'; // Replace with actual dark logo path e.g., '/dark.png' if available, or keep light as fallback/placeholder
-  const darkLogoPlaceholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // 1x1 transparent pixel for cases where dark isn't ready
+  const lightLogoPath = '/light.png'; // Use the uploaded light mode logo
+  const darkLogoPath = '/dark.png'; // Use the uploaded dark mode logo
+
+  const darkLogoPlaceholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // 1x1 transparent pixel
 
   // State for the dynamically determined image source
   const [imageSrc, setImageSrc] = useState(lightLogoPath); // Start with light logo
@@ -145,10 +146,7 @@ export default function Home() {
         if (isMounted) {
             // Determine the correct logo based on the theme
             const resolvedTheme = theme === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
-            // Use specific logo paths based on the theme
             const currentSrc = resolvedTheme === 'dark' ? darkLogoPath : lightLogoPath;
-            // Note: Consider adding a check here if darkLogoPath is just a placeholder
-            // and use darkLogoPlaceholder instead if needed. For now, assuming darkLogoPath exists or light is used.
             setImageSrc(currentSrc);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,7 +393,7 @@ export default function Home() {
          if (result.fileContent) {
            triggerDownload(result.fileName, result.fileContent);
          } else if (result.zipBuffer) {
-             const buffer = Buffer.from(result.zipBuffer);
+             const buffer = Buffer.from(result.zipBuffer); // Convert plain JS object to Buffer
              triggerDownload(result.fileName, buffer);
          } else {
               toast({ title: 'Download Error', description: 'No file content received.', variant: 'destructive' });
@@ -434,10 +432,13 @@ export default function Home() {
     // Function to handle image loading errors
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
         const target = e.target as HTMLImageElement;
-        console.error(`Image failed to load: ${target.src}`);
-        // Fallback to a placeholder if the intended image fails
-        if (imageSrc !== darkLogoPlaceholder) {
-            setImageSrc(darkLogoPlaceholder);
+        // Prevent logging errors for the placeholder itself
+        if (target.src !== darkLogoPlaceholder) {
+            console.error(`Image failed to load: ${target.src}`);
+            // Fallback to a placeholder if the intended image fails and it's not already the placeholder
+             if (imageSrc !== darkLogoPlaceholder) {
+                setImageSrc(darkLogoPlaceholder);
+             }
         }
     };
 
@@ -685,6 +686,9 @@ export default function Home() {
           </Form>
         </CardContent>
       </Card>
+
+        {/* Chatbot Component */}
+      <Chatbot />
     </main>
   );
 }

@@ -94,3 +94,34 @@
      background-image: linear-gradient(to top, #30cfd0 0%, #330867 100%);
   }
 }
+
+/* Chatbot button animations */
+@layer utilities {
+  @keyframes pulse-scale {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05); /* Slightly smaller scale */
+      opacity: 0.9;
+    }
+  }
+
+  .animate-pulse-scale {
+    animation: pulse-scale 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+   /* Tailwind doesn't have a direct 'ping' animation utility class like this by default,
+      so we define it here. It creates an expanding ring effect. */
+    @keyframes ping {
+      75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+      }
+    }
+
+    .animate-ping {
+      animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+}
