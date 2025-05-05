@@ -101,7 +101,9 @@ function findNearestMatch(method_name_with_parens: string, mapping: { [key: stri
     }
     // If no match found, return the original method name without parentheses
     // console.warn(`No matching keyword found for ${method_name_with_parens} in mapping. Using base name.`);
-    return method_name_with_parens.replace(/\(\)$/, ''); // Remove trailing ()
+    // Python logic returned the method name with parens, replicating that first
+    // return method_name_with_parens.replace(/\(\)$/, ''); // Remove trailing ()
+    return method_name_with_parens; // Return original with parens as per python logic
 }
 
 
@@ -115,7 +117,6 @@ function extractLocator(locator_text: string): string {
     // Handle ID selectors: locator("#myId") -> \#myId (Python logic used \# prefix)
     // RF usually uses id=myId, but the Python logic returns \#myId, so we replicate that for now.
     if (locator_text.includes('#')) {
-        // Extract the part after # and before the next quote or end of string
         const match = locator_text.match(/#([^"']+)/);
         if (match) {
             return `\\#${match[1]}`; // Replicate Python's output: \#someId
@@ -134,10 +135,9 @@ function extractLocator(locator_text: string): string {
          return `"${match[1]}"`; // Return the content within quotes
      }
 
-    // Fallback: return original wrapped in quotes if no pattern matches (Python logic)
-    // This fallback might be problematic for RF.
-     // console.warn(`Could not extract standard locator from: ${locator_text}. Returning quoted.`);
-    return `"${locator_text}"`;
+    // Fallback: return original text (Python logic returned locator_text, not wrapped in quotes)
+     // console.warn(`Could not extract standard locator from: ${locator_text}. Returning original.`);
+    return locator_text;
 }
 
 /**
@@ -175,7 +175,6 @@ function alignRobotCode(inputContent: string): string {
         // Apply indentation logic based on Python script's target format
         if (insideVariables || insideSettings) {
             // Variables/Settings: Keep original line (likely already aligned or single keyword)
-            // Python logic appended \n, so we trim and add \n to replicate
              formattedLines.push(`${strippedLine}\n`);
         } else if (insideTestCase) {
             // Test Cases: Indent steps with 4 spaces, keep test case names non-indented
@@ -190,8 +189,6 @@ function alignRobotCode(inputContent: string): string {
             }
         } else {
              // If somehow outside known sections, preserve original line
-             // This handles the case before the first *** Test Cases *** header is encountered
-             // The python code treats these as potential test case names.
              if (strippedLine.startsWith('***')) {
                   formattedLines.push(line); // Preserve other section headers
              } else if (strippedLine) {
@@ -204,10 +201,7 @@ function alignRobotCode(inputContent: string): string {
         }
     }
 
-     // Join lines. Note: Python logic adds \n to each formatted line, so join directly.
-     // Need to remove potential double newlines at the end.
      let result = formattedLines.join('');
-     // Remove trailing blank lines
      while (result.endsWith('\n\n')) {
          result = result.substring(0, result.length - 1);
      }
@@ -218,7 +212,7 @@ function alignRobotCode(inputContent: string): string {
 
 /**
  * Converts a single Playwright Python script content to Robot Framework format.
- * (Translated from Python convert_playwright_code)
+ * Based closely on the provided Python conversion logic.
  * @param inputCode The content of the Python script.
  * @param mapping The Playwright-to-Robot keyword mapping.
  * @returns The generated Robot Framework code as a string.
@@ -231,29 +225,23 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
     const urlMapping: { [key: string]: string } = {};
     let writingStarted = false;
     let firstGoto = true;
-    let variableCounter = 1;
+    let variable_counter = 1; // Initialize variable_counter
     let contextCloseFound = false;
-    let insideTestCaseDefinition = false; // Track if we are inside a test case block (starts after a non-indented line in *** Test Cases ***)
-    let currentTestCaseName = ""; // Store the current test case name
+    let insideTestCaseDefinition = false; // Track if we are inside a test case block
 
     const rawLines = inputCode.split("\n");
     let lines: string[] = [];
 
-    // Pre-processing from Python logic for page.once
-    // Replicate the specific replacement logic from the Python code
+    // Pre-processing for page.once (from Python logic)
     rawLines.forEach(line => {
-        const stripped = line.trim();
-        if (stripped.startsWith("page.once")) {
-             // Python code replaces any page.once line with these two lines
-             lines.push('    ${promise} =       Promise To    Wait For Alert    action=accept   # text=<text content of alert box if you want to assert>');
-             lines.push('    # <Line which triggers the alert action> ex click  <button>');
+        if (line.trim().startsWith("page.once")) {
+            // Python code replaces page.once with these two specific lines (using Python indentation)
+            lines.push('    ${promise} =       Promise To    Wait For Alert    action=accept   # text=<text content of alert box if you want to assert>');
+            lines.push('    # <Line which triggers the alert action> ex click  <button>');
         } else {
             lines.push(line);
         }
     });
-
-
-    let currentTestSteps: string[] = []; // Buffer for steps
 
     for (const line of lines) {
         const stripped_line = line.trim();
@@ -262,105 +250,81 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
             continue; // Skip empty lines and comments
         }
 
-         // Handle the specific 'dialog.dismiss()' case from Python
-         // Note: The Python pre-processing already replaced page.once, so this specific check might be redundant
-         // unless dismiss was handled differently. Let's keep it for closer adherence.
-         // The python code looked for '.once("dialog", lambda dialog: dialog.dismiss())'
-         // Let's assume the goal was to map dismiss actions differently.
-         // Check if the original line (before pre-processing) contained dismiss
-         const originalLineTrimmed = line.trim(); // Check original line
-         if (originalLineTrimmed.includes('lambda dialog: dialog.dismiss()') && originalLineTrimmed.includes('.once("dialog"')) {
-             // If the original line was a dismiss, we add the RF promise for dismiss
-             // NOTE: The Python pre-processing replaced this line already. If we want dismiss,
-             // we should modify the pre-processing. For now, adhering to the provided Python,
-             // all page.once become 'accept'. Let's comment this out unless pre-processing is changed.
-             // testCaseLines.push('    ${promise} =       Promise To    Wait For Alert    action=dismiss   # text=<text content>');
-             // testCaseLines.push('    # <Line which triggers the alert action>');
-             continue; // Skip further processing of this line as it was handled (or pre-processed)
-         }
-
+        // Handle dismiss alert (based on Python comment logic)
+        // Note: Python pre-processing already replaces page.once lines.
+        // The Python code had a specific check for `lambda dialog: dialog.dismiss()` within `.once("dialog"`,
+        // but the replacement logic uses 'action=accept'. To strictly follow the provided Python code's *effective* behavior
+        // (where all page.once becomes accept), we don't need a separate dismiss case here.
+        // If the intent was different, the pre-processing should be adjusted.
+        // Example: if originalLineTrimmed.includes('lambda dialog: dialog.dismiss()') ...
 
         // Handle context.close()
         if (stripped_line === "context.close()") {
             contextCloseFound = true;
-            // Python code breaks here. Replicate that behavior.
-            break;
+            break; // Exit processing as per Python logic
         }
 
-        // Handle expect() - Translated from Python logic
+        // Handle expect() - Following Python structure
         if (stripped_line.startsWith("expect(")) {
-            // Ensure we're writing steps (i.e., after the first goto or implicit start)
-            if (!writingStarted && testCaseLines.length <= 1) {
-                testCaseLines.push("Implicit Test Case"); // Start a default test case if expect appears first
-                writingStarted = true; // Assume we start writing test steps now
-                insideTestCaseDefinition = true;
-            } else if (!writingStarted && testCaseLines.length > 1 && !insideTestCaseDefinition) {
-                 // If we have a test case name but haven't started writing, mark as started
-                 writingStarted = true;
-                 insideTestCaseDefinition = true;
-            }
+            const variable_name = `\${var${variable_counter}}`;
+            variable_counter++; // Increment the counter correctly
 
-
-            const variable_name = `\${var${variable_counter}}`; // Use ${} for RF vars
-            variableCounter++;
-            // Regex closer to Python's: expect(page.locator("selector")).to_contain_text("text")
-            const locatorMatch = stripped_line.match(/locator\(['"]([^'"]+)['"]\)/); // Simpler regex from python code
+            // Python regex: r'locator\("([^"]+)"\)'
+            const locatorMatch = stripped_line.match(/locator\("([^"]+)"\)/);
             if (locatorMatch) {
                  let locator_text = locatorMatch[1];
-                 // Python logic specific transformation: #id -> \#id
-                 if (locator_text.startsWith("#")) {
-                     locator_text = `\\#${locator_text.substring(1)}`; // Replicate Python's output
-                 } else {
-                     // If not #id, Python logic calls extract_locator which wraps in quotes or extracts name=""
-                     locator_text = extractLocator(`.locator("${locator_text}")`); // Pass a construct it understands
+                 // Python logic: if "#" in locator_text: locator_text = r"\#" + locator_text.split("#")[-1]
+                 if (locator_text.includes("#")) {
+                     locator_text = `\\#${locator_text.split("#").pop()}`; // Use pop() for last element
                  }
-
-                 // Python code uses 'Set Variable' and 'Wait For Elements State'
-                 testCaseLines.push(`    ${variable_name}    Set Variable    ${locator_text}`); // RF variable setting
+                 // Python logic adds these lines for expect:
+                 testCaseLines.push(`    ${variable_name}    Set Variable    ${locator_text}`);
                  testCaseLines.push(`    Wait For Elements State    ${variable_name}    visible    timeout=10s`);
 
-                // Python code uses 'Get Text' for assertion
-                const expectedTextMatch = stripped_line.match(/to_contain_text\(['"]([^'"]+)['"]\)/);
+                // Python regex: r'to_contain_text\("([^"]+)"\)'
+                const expectedTextMatch = stripped_line.match(/to_contain_text\("([^"]+)"\)/);
                 if (expectedTextMatch) {
                     const expected_text = expectedTextMatch[1];
-                    testCaseLines.push(`    Get Text    ${variable_name}    ==    ${expected_text}`); // RF Get Text comparison
+                     // Python uses 'Get Text' keyword for assertion:
+                    testCaseLines.push(`    Get Text    ${variable_name}    ==    ${expected_text}`); // Using '==' for assertion based on RF common practice
                 }
-            } else {
-                // If locator extraction fails, add a comment
-                testCaseLines.push(`    # TODO: Convert Playwright assertion: ${stripped_line}`);
             }
             continue; // Move to next line
         }
 
-        // Handle page.goto() - Translated from Python logic
-         // Python uses a simple regex: page\d*\.goto\("[^"]+"\)'
+        // Handle page.goto() - Following Python structure
+        // Python regex: r'page\d*\.goto\("[^"]+"\)'
          const gotoMatch = stripped_line.match(/page\d*\.goto\(['"]([^'"]+)['"]\)/);
          if (gotoMatch) {
-             writingStarted = true; // Start processing steps after the first goto
+             writingStarted = true;
              const url = gotoMatch[1];
 
-            if (firstGoto) {
-                 // Python code adds "Test Case" name (no name extraction, just literal)
-                 // It also adds Browser/Context/Page keywords
-                 testCaseLines.push("Test Case"); // Literal "Test Case" name from Python logic
-                 insideTestCaseDefinition = true; // We are now inside a test case definition
-                 testCaseLines.push(`    New Browser        ${variableLines.includes('${BROWSER}') ? '${BROWSER}' : 'firefox'}        headless=False`); // Reference variable or default firefox
-                 testCaseLines.push(`    New Context        viewport={'width': 1920, 'height': 1080}`); // Use RF dictionary syntax
-                 // The page navigation URL comes from the variable mapping
+             if (firstGoto) {
+                 // Python adds "Test Case" name (literal) and Browser/Context/Page setup
+                 testCaseLines.push("Test Case"); // Literal name from Python
+                 insideTestCaseDefinition = true;
+                 // Python line: "New Browser ${BROWSER} headless=False timeout=60000 slowMo=0:00:01"
+                 // RF Browser doesn't directly support slowMo like this, using standard keywords.
+                 testCaseLines.push(`    New Browser        ${variableLines.includes('${BROWSER}') ? '${BROWSER}' : 'firefox'}        headless=False`);
+                 // Python line: "New Context viewport={'width': 1920, 'height': 1080}"
+                 testCaseLines.push(`    New Context        viewport={'width': 1920, 'height': 1080}`);
+                 // Python uses URL variable mapping
                  let var_name = urlMapping[url];
                  if (!var_name) {
-                     var_name = `\${URL${urlCounter}}`; // Use ${}
+                     var_name = `\${URL${urlCounter}}`;
                      urlMapping[url] = var_name;
                      if (!variableLines.some(v => v.startsWith(var_name))) {
                         variableLines.push(`${var_name}    ${url}`);
                      }
                      urlCounter++;
                  }
-                 testCaseLines.push(`    New Page            ${var_name}`); // Navigate using the variable
+                 // Python line: "New Page ${URL<counter>}"
+                 testCaseLines.push(`    New Page            ${var_name}`);
                  firstGoto = false;
-            } else {
-                 // Subsequent navigations use Go To
-                 // Need to look up or create the variable for the URL
+             } else {
+                // Subsequent navigations just use "Go To" in Python script (implicitly)
+                // The Python code doesn't explicitly show `Go To` for subsequent URLs, it seems to rely
+                // on the URL variable mapping. Replicating the variable lookup.
                  let var_name = urlMapping[url];
                  if (!var_name) {
                      var_name = `\${URL${urlCounter}}`;
@@ -370,142 +334,122 @@ function convertSinglePlaywrightCode(inputCode: string, mapping: { [key: string]
                       }
                      urlCounter++;
                  }
+                 // Use Go To keyword for subsequent navigations in RF
                  testCaseLines.push(`    Go To    ${var_name}`);
-            }
-            continue; // Move to next line
-        }
+             }
+             continue; // Move to next line
+         }
 
-        // If not writingStarted (i.e., before first goto or implicit start), skip other lines
+        // Skip lines before the first goto or implicit start
         if (!writingStarted) {
             continue;
         }
 
-        // Handle browser.close()
+        // Handle browser.close() - Following Python structure
         if (stripped_line.startsWith("browser.close")) {
+             // Python adds "Close Browser" indented
              testCaseLines.push("    Close Browser");
-             writingStarted = false; // Stop processing further lines after browser close
+             writingStarted = false; // Stop processing after browser close
              continue;
         }
 
-        // General command processing - Translated from Python logic
+        // General command processing - Following Python structure
         const parts = safeSplitOutsideQuotes(stripped_line, '.');
-        const commandParts = parts.map(part => part.trim()).filter(part => part);
+        const commandParts = parts.map(part => part.trim()).filter(part => part); // Python: parts = [part.strip() for part in parts if part.strip()]
 
-        if (commandParts.length < 1) {
+        if (commandParts.length < 1) { // Python: if not parts: continue
             continue;
         }
 
          // Python logic: method is last part, locator_chain is parts[1:-1]
-         const methodPart = commandParts[commandParts.length - 1];
-         // Python assumes the object (page, context etc) is parts[0], skip it
-         const locatorChainParts = commandParts.slice(1, -1); // Parts between object and method
+         const methodPart = commandParts[commandParts.length - 1]; // Python: method = parts[-1]
+         const locatorChainParts = commandParts.slice(1, -1); // Python: locator_chain = parts[1:-1]
 
-
+         // Python regex: r'([a-zA-Z_]+)\((.*)\)'
         const methodMatch = methodPart.match(/^([a-zA-Z_]+)\((.*)\)$/);
         if (methodMatch) {
             const method_name_only = methodMatch[1];
-            const method_name_signature = `${method_name_only}()`; // Signature for mapping lookup
-            let method_args_raw = methodMatch[2]?.trim() ?? '';
+            const method_name_signature = `${method_name_only}()`; // Python: method_name = method_match.group(1) + "()"
+            let method_args_raw = methodMatch[2]?.trim() ?? ''; // Python: method_args = method_match.group(2)
 
-            const transformed_method = findNearestMatch(method_name_signature, mapping);
+            const transformed_method = findNearestMatch(method_name_signature, mapping); // Python: transformed_method = find_nearest_match(...)
 
-             let locator_rf = "";
-             if (locatorChainParts.length > 0) {
-                 // Python joins with '><' and then extracts via regex r'<(.*)>'
-                 const locatorChainStr = "<" + locatorChainParts.join("><") + ">";
-                 const locatorMatch = locatorChainStr.match(/<(.*)>/);
-                 if (locatorMatch) {
-                    locator_rf = extractLocator(locatorMatch[1]); // Use translated extractLocator
+            // Locator extraction based on Python logic
+            let locator_text = "";
+            if (locatorChainParts.length > 0) {
+                // Python: locator_text = "<" + "><".join(locator_chain) + ">"
+                const joined_chain = "<" + locatorChainParts.join("><") + ">";
+                // Python: locator_text = re.search(r'<(.*)>', locator_text).group(1)
+                 const chainMatch = joined_chain.match(/<(.*)>/);
+                 if (chainMatch) {
+                     locator_text = extractLocator(chainMatch[1]); // Python: locator_text = extract_locator(locator_text)
                  }
-             } else if (commandParts.length === 2 && commandParts[0].match(/^page\d*$/)) {
-                // Handle direct page actions like page.click("selector") -> Click "selector"
-                // Here, the selector is inside the method_args_raw
-                 locator_rf = extractLocator(method_args_raw); // Extract locator from args
-                 method_args_raw = ""; // Clear args as they were the locator
-             } else if (commandParts.length > 1 && commandParts[0].match(/^page\d*$/)) {
-                  // If no locator chain parts, but method has args, maybe the arg is the locator?
-                  // Example: page.fill("input#id", "text") -> Fill Text    \#id    text
-                  // Extract locator from the *first* argument if applicable
-                  const firstArgMatch = method_args_raw.match(/^(['"])(.*?)\1(?:\s*,\s*(.*))?$/);
-                   if (firstArgMatch) {
-                       locator_rf = extractLocator(firstArgMatch[2]); // Use the first arg as locator
-                       method_args_raw = firstArgMatch[3] ?? ""; // Keep remaining args
-                   } else {
-                        // Cannot determine locator, leave empty
-                       // console.warn(`Could not determine locator for: ${stripped_line}`);
-                   }
-             }
+            } else {
+                // If no chain, Python logic implicitly uses args as locator in some cases (like page.click("selector"))
+                // This part is less explicit in the python code, but extractLocator handles cases like `("selector")`
+                locator_text = extractLocator(method_args_raw);
+                // If args were used as locator, clear them? Python doesn't explicitly show this, but it's implied.
+                 if (locator_text !== method_args_raw) { // Check if extractLocator actually extracted something different
+                     method_args_raw = ""; // Clear args if they were interpreted as a locator
+                 }
+            }
 
 
              // Argument Handling based on Python logic
              let reformatted_line = "";
-             if (method_name_signature === "select_option()") {
+             if (method_name_signature === "select_option()") { // Python: if method_name == "select_option()":
                  const args = method_args_raw.trim();
                  if (args.startsWith("[")) {
-                     // Python formats as: Method Locator [arg1, arg2]
-                      reformatted_line = `    ${transformed_method}    ${locator_rf}    ${args}`;
+                     // Python: reformatted = f" {transformed_method} {locator_text} {args}" (Indentation added later)
+                      reformatted_line = `    ${transformed_method}    ${locator_text}    ${args}`;
                  } else {
-                     // Python formats as: Select options by Locator Value Arg
-                     // Note: Python code had a typo "Select options by" should likely be mapped keyword
-                     // Using transformed_method which should be the correct RF keyword from mapping
-                      reformatted_line = `    ${transformed_method}    ${locator_rf}    Value    ${args}`;
+                     // Python: reformatted = f" Select options by {locator_text} Value {args}" (Indentation added later)
+                     // Assuming "Select options by" should be the mapped keyword (transformed_method)
+                      reformatted_line = `    ${transformed_method}    ${locator_text}    Value    ${args}`;
                  }
-
              } else if (method_args_raw) {
-                 // Generic argument cleaning (remove outer quotes) - From Python logic
-                  const cleaned_args = method_args_raw.replace(/^['"](.*)['"]$/, '$1').replace(/^'(.*)'$/, '$1');
-                  // Construct line: Method Locator Arg1 Arg2 ...
-                   const argsArray = cleaned_args.split(/,\s*(?=(?:(?:[^"']*["']){2})*[^"']*$)/) // Basic split by comma, respecting quotes
-                                       .map(arg => arg.trim().replace(/^['"](.*)['"]$/, '$1'));
-                  reformatted_line = `    ${transformed_method}    ${locator_rf}    ${argsArray.join('    ')}`.trim();
+                 // Python: cleaned_args = re.sub(r'^"(.*)"$', r'\1', method_args)
+                 const cleaned_args = method_args_raw.replace(/^["'](.*)["']$/, '$1');
+                  // Python: reformatted = f" {transformed_method} {locator_text} {cleaned_args}".strip() (Indentation added later)
+                 reformatted_line = `    ${transformed_method}    ${locator_text}    ${cleaned_args}`.trim();
              } else {
-                 // Method without arguments
-                 reformatted_line = `    ${transformed_method}    ${locator_rf}`.trim();
+                 // Python: reformatted = f" {transformed_method} {locator_text}".strip() (Indentation added later)
+                 reformatted_line = `    ${transformed_method}    ${locator_text}`.trim();
              }
-             testCaseLines.push(reformatted_line);
+             // Add the formatted line with proper indentation
+             testCaseLines.push(reformatted_line); // Python appends to test_case_lines
 
         } else {
-            // If the last part doesn't look like a method call, treat the whole line differently
-             // Python logic joins parts with "    ": "        " + "    ".join(parts))
+             // Python: test_case_lines.append(" " + " ".join(parts)) -> Seems like 4 spaces + 4 spaces join
+             // Replicating the likely intended Robot Framework structure: Keyword Arg1 Arg2 ...
              testCaseLines.push(`    ${commandParts.join('    ')}`);
         }
     }
 
-     // After processing all lines, add teardown if context.close() was found
+     // Add teardown based on Python logic
      if (contextCloseFound) {
-        // Check if we are inside a test case, otherwise add the teardown directly
-        if (insideTestCaseDefinition || testCaseLines.length > 1) { // Check if any test case was started
-             testCaseLines.push("    Close Context");
-             // Close Browser is often implied by Close Context in RF Browser, but Python added both
-             // testCaseLines.push("    Close Browser"); // Optional based on exact RF behavior desired
-        } else {
-             // This case shouldn't normally happen if context.close() is inside a test function
-             // But if it appeared globally, add it outside test case structure (less common)
-             console.warn("context.close() found outside of a detectable test case structure.");
-             // Decide where to put it; maybe a separate keyword? For now, append to end.
-             if (!testCaseLines.includes("    Close Context")) testCaseLines.push("    Close Context");
-             // if (!testCaseLines.includes("    Close Browser")) testCaseLines.push("    Close Browser");
-        }
-     } else if (writingStarted && !firstGoto) {
-         // If conversion started but context.close was not found, add default teardown
-         const lastStep = testCaseLines[testCaseLines.length - 1]?.trim();
+        // Python adds Close Context and Close Browser
+        testCaseLines.push("    Close Context");
+        testCaseLines.push("    Close Browser");
+     } else if (writingStarted && !firstGoto) { // Add default teardown if needed
+        const lastStep = testCaseLines[testCaseLines.length - 1]?.trim();
          if (lastStep && !lastStep.startsWith('Close Context') && !lastStep.startsWith('Close Browser')) {
             testCaseLines.push("    Close Context");
-         }
+            // Close Browser is often added in Python too, replicating
+            testCaseLines.push("    Close Browser");
+        }
      }
 
 
-    // Combine all sections
+    // Combine all sections based on Python structure
     const final_output = [
-        ...outputLines, '', // Blank line after Settings
-        ...variableLines, '', // Blank line after Variables
+        ...outputLines, '', // Blank line separator
+        ...variableLines, '', // Blank line separator
         ...testCaseLines
     ].join('\n');
 
-    // Align the final generated code
-    // The python code calls align_robot_test_cases on the *output file*.
-    // We simulate this by aligning the string content.
-    return alignRobotCode(final_output); // Use the translated align function
+    // Apply alignment as the last step, similar to Python calling align_robot_test_cases on the output file
+    return alignRobotCode(final_output);
 }
 
 
@@ -647,7 +591,9 @@ async function performConversion(data: ValidatedFormData): Promise<ConversionRes
                     console.log(`Converted and added to zip: ${inputFileBaseName} -> ${outputFileName}`);
                 } catch (fileError: any) {
                     console.error(`Error converting file ${inputFileBaseName}: ${fileError.message}`);
-                     zip.addFile(`${outputFileName}.ERROR.txt`, Buffer.from(`Failed to convert ${inputFileBaseName}: ${fileError.message}\n`, 'utf-8'));
+                     // Add error file to zip for user feedback
+                     const errorContent = `Failed to convert ${inputFileBaseName}:\n${fileError.stack || fileError.message}\n`;
+                     zip.addFile(`${outputFileName}.ERROR.txt`, Buffer.from(errorContent, 'utf-8'));
                 }
             }
 
@@ -664,7 +610,15 @@ async function performConversion(data: ValidatedFormData): Promise<ConversionRes
         }
     } catch (error: any) {
         console.error('Conversion process error:', error);
-        return { success: false, error: `Conversion failed: ${error.message}` };
+         let errorMessage = 'An unexpected server error occurred during conversion.';
+         if (error instanceof Error) {
+             errorMessage = `Conversion failed: ${error.message}`;
+             if (error.stack) {
+                 console.error("Stack Trace:", error.stack); // Log stack trace for debugging
+                 errorMessage += `\nStack: ${error.stack}`; // Optionally include stack in error message (be cautious in production)
+             }
+         }
+         return { success: false, error: errorMessage };
     } finally {
         // Cleanup logic if needed
     }
@@ -702,7 +656,7 @@ export async function convertCode(formData: FormData): Promise<ConversionResult>
       mappingFile: mappingFile,
       selectedSheetName: selectedSheetName, // Add sheet name to validation object
       inputFiles: inputFiles,
-      isSingleFile: isSingleFileValue || 'false',
+      isSingleFile: isSingleFileValue || 'false', // Pass string for transform
     };
 
 
@@ -711,10 +665,11 @@ export async function convertCode(formData: FormData): Promise<ConversionResult>
     if (!validationResult.success) {
        console.error("Server-side FormData validation failed:", validationResult.error.errors);
        const userFriendlyErrors = validationResult.error.errors.map(e => {
-           if (e.path.includes('mappingFile')) return 'Mapping file error.';
-           if (e.path.includes('selectedSheetName')) return 'Please select a sheet from the mapping file.'; // Specific error for sheet
-           if (e.path.includes('inputFiles')) return 'Input file/folder error.';
-           return `${e.path.join('.')}: ${e.message}`;
+           const path = e.path.join('.');
+           if (path === 'mappingFile') return 'Mapping file error: ' + e.message;
+           if (path === 'selectedSheetName') return 'Sheet selection error: ' + e.message;
+           if (path === 'inputFiles') return 'Input file/folder error: ' + e.message;
+           return `${path}: ${e.message}`;
        }).join('; ');
        return { success: false, error: `Invalid input: ${userFriendlyErrors}` };
     }
