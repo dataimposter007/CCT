@@ -1,3 +1,4 @@
+
 'use client';
 
 import type React from 'react';
@@ -9,18 +10,16 @@ import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Loader2, Upload, AlertTriangle } from 'lucide-react'; // Removed Mail, Sun, Moon
+import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Loader2, Upload, AlertTriangle } from 'lucide-react'; // Removed Mail
 import { useToast } from '@/hooks/use-toast';
 import { convertCode, getSheetNames } from './actions'; // Import server actions
-// Removed useTheme import
-// Removed Switch import as it's no longer used
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import Link from 'next/link'; // Import Link for menu items
 import { Progress } from "@/components/ui/progress"; // Import Progress component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
 import Chatbot from '@/components/chatbot'; // Import Chatbot component
-
+import AboutDialog from '@/components/about-dialog'; // Import the new AboutDialog component
 
 // Define Zod schema for form validation
 const FormSchema = zod.object({
@@ -51,23 +50,21 @@ function triggerDownload(filename: string, data: string | Buffer) {
 
 
 // Simple Menu Bar Component
-const MenuBar = () => {
-    // Removed state and effect related to theme switching
-
+interface MenuBarProps {
+  onAboutClick: () => void; // Add prop type for the click handler
+}
+const MenuBar = ({ onAboutClick }: MenuBarProps) => {
     return (
         <nav className="w-full flex justify-between items-baseline py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
             <div className="flex items-baseline space-x-4">
-                 <span className="text-3xl font-extrabold text-primary dark:text-primary mr-6">
+                 <span className="text-3xl font-extrabold text-primary mr-6">
                     NOKIA
                  </span>
-                <Link href="#" passHref>
-                    <Button variant="ghost" className="hover:bg-accent/80 hover:text-accent-foreground px-3 py-1.5 h-auto">
-                        <Info className="mr-2 h-4 w-4" /> About
-                    </Button>
-                </Link>
-                {/* Removed Contact Button */}
+                {/* Updated About button to use the passed handler */}
+                <Button variant="ghost" className="hover:bg-accent/80 hover:text-accent-foreground px-3 py-1.5 h-auto" onClick={onAboutClick}>
+                    <Info className="mr-2 h-4 w-4" /> About
+                </Button>
             </div>
-            {/* Removed Theme Toggle */}
         </nav>
     );
 };
@@ -80,13 +77,13 @@ export default function Home() {
   const [sheetError, setSheetError] = useState<string | null>(null);
   const [progressValue, setProgressValue] = useState(0); // State for progress bar
   const [isMounted, setIsMounted] = useState(false); // State to track client mount
+  const [isAboutDialogOpen, setIsAboutDialogOpen] = useState(false); // State for About dialog
   const { toast } = useToast();
 
   // File input refs
   const mappingFileInputRef = useRef<HTMLInputElement>(null);
   const inputFilesInputRef = useRef<HTMLInputElement>(null);
 
-  // Use only dark logo path as light mode is removed
   const logoPath = '/dark.png';
   const darkLogoPlaceholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // 1x1 transparent pixel
 
@@ -99,8 +96,6 @@ export default function Home() {
     // Set image source directly to dark logo path on mount
     setImageSrc(logoPath);
   }, []);
-
-  // Removed effect for switching image based on theme
 
 
   const form = useForm<FormValues>({
@@ -414,6 +409,8 @@ export default function Home() {
             console.error(`Image failed to load: ${target.src}`);
             // Fallback to a placeholder if the intended image fails
             setImageSrc(darkLogoPlaceholder);
+        } else {
+            // console.log(`Image loaded successfully: ${target.src}`); // Uncomment for debugging successful loads
         }
     };
 
@@ -422,7 +419,7 @@ export default function Home() {
     // Use dark class directly on main element as light mode is removed
     <main className="dark flex min-h-screen flex-col items-center p-4 sm:p-8 relative">
 
-        <MenuBar />
+        <MenuBar onAboutClick={() => setIsAboutDialogOpen(true)} />
 
        {/* Logo - Positioned above the card */}
        <div className="flex flex-col items-center mb-6 text-center relative">
@@ -665,6 +662,10 @@ export default function Home() {
 
         {/* Chatbot Component */}
       <Chatbot />
+
+       {/* About Dialog */}
+      <AboutDialog isOpen={isAboutDialogOpen} onOpenChange={setIsAboutDialogOpen} />
     </main>
   );
 }
+
