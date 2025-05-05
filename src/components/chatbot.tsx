@@ -1,3 +1,4 @@
+
 'use client';
 
 import type React from 'react';
@@ -259,8 +260,8 @@ export default function Chatbot() {
     }
   };
 
-  // Input is disabled if loading OR if the bot is waiting for a button choice AND not accepting feedback
-  const isInputDisabled = isLoading || (chatState === 'awaiting_choice');
+  // Input is disabled only if loading
+  const isInputDisabled = isLoading;
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
