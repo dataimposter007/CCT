@@ -13,19 +13,19 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 165 100% 47%; /* Updated Teal from image */
-    --primary-foreground: 0 0% 100%; /* White text on Teal */
+    --primary: 25 95% 53%; /* Updated Orange */
+    --primary-foreground: 0 0% 100%; /* White text on Orange */
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
     --accent: 0 0% 96.1%;
-    --accent-foreground: 165 100% 47%; /* Updated Teal text on accent */
+    --accent-foreground: 25 95% 53%; /* Updated Orange text on accent */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 165 100% 47%; /* Updated Teal for focus rings */
+    --ring: 25 95% 53%; /* Updated Orange for focus rings */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -34,12 +34,12 @@
     --radius: 0.5rem;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 26%;
-    --sidebar-primary: 165 100% 47%; /* Updated Teal */
+    --sidebar-primary: 25 95% 53%; /* Updated Orange */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 175 33% 92%;
-    --sidebar-accent-foreground: 165 100% 47%; /* Updated Teal */
+    --sidebar-accent: 175 33% 92%; /* This remains a light teal-ish accent */
+    --sidebar-accent-foreground: 25 95% 53%; /* Updated Orange */
     --sidebar-border: 0 0% 89.8%;
-    --sidebar-ring: 165 100% 47%; /* Updated Teal */
+    --sidebar-ring: 25 95% 53%; /* Updated Orange */
   }
 
   .dark {
@@ -49,19 +49,19 @@
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 165 100% 47%; /* Updated Teal Accent - remains same */
+    --primary: 25 95% 53%; /* Updated Orange Accent - remains same */
     --primary-foreground: 0 0% 100%; /* White text still contrasts well */
     --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 14.9%;
     --muted-foreground: 0 0% 63.9%;
     --accent: 0 0% 14.9%;
-    --accent-foreground: 165 100% 47%; /* Updated Teal Text on Dark Accent */
+    --accent-foreground: 25 95% 53%; /* Updated Orange Text on Dark Accent */
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
-    --ring: 165 100% 47%; /* Updated Teal for focus rings */
+    --ring: 25 95% 53%; /* Updated Orange for focus rings */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -69,12 +69,12 @@
     --chart-5: 340 75% 55%;
     --sidebar-background: 0 0% 15%;
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 165 100% 47%; /* Updated Teal */
+    --sidebar-primary: 25 95% 53%; /* Updated Orange */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 25%;
-    --sidebar-accent-foreground: 165 100% 47%; /* Updated Teal */
+    --sidebar-accent-foreground: 25 95% 53%; /* Updated Orange */
     --sidebar-border: 0 0% 30%;
-    --sidebar-ring: 165 100% 47%; /* Updated Teal */
+    --sidebar-ring: 25 95% 53%; /* Updated Orange */
   }
 }
 
