@@ -2,7 +2,7 @@
 'use client';
 
 import type React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // Added useRef
 import { useForm, type SubmitHandler } from 'react-hook-form'; // Removed FormProvider import as <Form> handles it
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -129,6 +129,7 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false); // State to track client mount
   const { toast } = useToast();
   const { theme } = useTheme(); // Get current theme
+  const fileInputRef = useRef<HTMLInputElement | null>(null); // Ref for file input
 
   // Effect to set isMounted to true after component mounts on client
   useEffect(() => {
@@ -138,7 +139,7 @@ export default function Home() {
    // Debugging: Log theme value when it changes and after mount
   useEffect(() => {
     if (isMounted) {
-      console.log("Current theme (mounted):", theme);
+      // console.log("Current theme (mounted):", theme);
     }
   }, [theme, isMounted]);
 
@@ -220,32 +221,89 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- form should only be initialized once
   }, [toast]); // Removed form from dependency array to prevent potential re-runs
 
-  const handleBrowse = async (fieldName: keyof FormValues) => {
-    // Placeholder for actual file/folder browsing logic using Electron/Tauri or web APIs
-    // This simulation needs to be replaced with real API calls in the target environment.
-    // Using window.showOpenFilePicker/showDirectoryPicker is removed due to cross-origin issues in some environments.
-    console.warn("File/Folder browsing/upload simulation. This does not use native pickers.");
 
-    const isSingleFile = form.getValues('isSingleFile');
-    const isOutput = fieldName === 'outputFolder';
-    const isMapping = fieldName === 'mappingFile';
+  // Function to trigger the hidden file input click
+  const triggerFileInput = (fieldName: keyof FormValues) => {
+    const input = document.getElementById(`fileInput-${fieldName}`) as HTMLInputElement | null;
+    if (input) {
+        // Determine attributes based on field name and state
+        const isSingle = form.getValues('isSingleFile');
+        const isMapping = fieldName === 'mappingFile';
+        const isInputPy = fieldName === 'inputFileOrFolder' && isSingle;
+        const isInputFolder = fieldName === 'inputFileOrFolder' && !isSingle;
 
-    // Fallback simulation
-    let simulatedPath = `/simulated/path/to/`;
-    if (isMapping) {
-        simulatedPath += 'mapping.xlsx';
-    } else if (isOutput) {
-        simulatedPath += 'output_folder';
-    } else { // inputFileOrFolder
-        simulatedPath += isSingleFile ? 'playwright_script.py' : 'playwright_scripts_folder';
+        // Reset attributes before click
+        input.removeAttribute('webkitdirectory');
+        input.removeAttribute('directory');
+        input.removeAttribute('multiple');
+        input.removeAttribute('accept');
+
+        if (isMapping) {
+            input.accept = ".xlsx";
+        } else if (isInputPy) {
+            input.accept = ".py";
+        } else if (isInputFolder) {
+            // Allow directory selection
+            input.setAttribute('webkitdirectory', 'true');
+            input.setAttribute('directory', 'true');
+            // Optionally allow multiple files within the directory if needed by backend logic later
+            // input.multiple = true;
+        } else if (fieldName === 'outputFolder') {
+            // Directory selection for output preference (though not used for actual output)
+            input.setAttribute('webkitdirectory', 'true');
+            input.setAttribute('directory', 'true');
+        }
+
+        input.click();
     }
-    form.setValue(fieldName, simulatedPath);
-    toast({
-        title: "Path Selected (Simulation)",
-        description: `Set ${fieldName} to: ${simulatedPath}`,
-        variant: "default",
-        duration: 3000,
-    });
+  };
+
+  // Function to handle file selection change
+  const handleFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    fieldName: keyof FormValues
+  ) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const selectedPath = files[0].name; // Use file name as placeholder
+      // IMPORTANT: Browser security prevents getting the full path.
+      // The backend logic currently expects full paths. This will need adjustment
+      // either in the frontend (e.g., using electron/tauri) or backend to handle file uploads.
+      // For now, we set the *file name* or a *simulated* folder path in the form.
+      let displayValue = selectedPath;
+       const isInputFolder = fieldName === 'inputFileOrFolder' && !form.getValues('isSingleFile');
+       const isOutputFolder = fieldName === 'outputFolder';
+
+       if (isInputFolder || isOutputFolder) {
+            // For folder selection, the 'name' is often just the folder name.
+            // We can try to get a relative path if available (browser dependent)
+            // Or just use the name. The backend CANNOT get the full path from this.
+             const relativePath = (files[0] as any).webkitRelativePath; // Non-standard, might not exist
+             displayValue = relativePath ? relativePath.split('/')[0] : files[0].name; // Show top-level folder name
+            form.setValue(fieldName, `/simulated/path/to/${displayValue}`); // MUST simulate full path for backend
+            console.warn(`Selected folder: ${displayValue}. Full path access is not possible in standard web browsers. Simulating path for backend.`);
+
+        } else {
+            form.setValue(fieldName, `/simulated/path/to/${displayValue}`); // MUST simulate full path for backend
+             console.warn(`Selected file: ${displayValue}. Full path access is not possible in standard web browsers. Simulating path for backend.`);
+        }
+
+        // console.log(`File/Folder selected for ${fieldName}: ${displayValue}`);
+
+       // Optionally, show a success toast
+       // toast({
+       //   title: "Selection Updated",
+       //   description: `${fieldName} set to ${displayValue}. Note: Full path is not available.`,
+       //   duration: 3000,
+       // });
+
+    } else {
+        // Handle case where selection is cancelled
+        console.log("File selection cancelled.");
+    }
+
+     // Reset the input value to allow selecting the same file again
+     event.target.value = '';
   };
 
 
@@ -264,6 +322,7 @@ export default function Home() {
     setIsLoading(true);
     setProgressValue(0); // Reset progress on new submission
     console.log("Form submitted with client data:", data);
+    console.warn("Submitting simulated full paths. Ensure backend handles this or uses file uploads.");
 
     // Perform client-side validation again before submitting (optional redundancy)
     const validation = ClientFormSchema.safeParse(data);
@@ -288,6 +347,7 @@ export default function Home() {
       });
 
       // Call the server action for conversion
+      // IMPORTANT: Sending simulated paths from 'data'. Backend needs to be aware.
       const result = await convertCode(data);
 
       // Ensure progress reaches 100% even if conversion is fast
@@ -318,9 +378,9 @@ export default function Home() {
         if (error instanceof Error) {
             // Provide more specific feedback for common errors
             if (error.message.includes('ENOENT') || error.message.includes('not found')) {
-                errorMessage = 'File or folder not found. Please check the paths.';
+                errorMessage = 'File or folder not found on server. Please check the simulated paths or ensure backend can access them.';
             } else if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Check file/folder permissions.';
+                errorMessage = 'Permission denied on server. Check file/folder permissions.';
             } else {
                  errorMessage = error.message;
             }
@@ -356,8 +416,8 @@ export default function Home() {
         : lightLogo
       : defaultLogo; // Use defaultLogo before mount
 
-     // Determine if optimization should be disabled (only for external URLs)
-     const unoptimized = typeof imageSrc === 'string' && imageSrc.startsWith('https://');
+     // Determine if optimization should be disabled (only for external URLs or non-string paths)
+     const unoptimized = typeof imageSrc !== 'string' || imageSrc.startsWith('https://');
 
 
   return (
@@ -383,7 +443,7 @@ export default function Home() {
                         className="rounded-lg shadow-lg object-contain bg-transparent" // Added bg-transparent
                         priority // Prioritize loading the logo
                         data-ai-hint="abstract logo"
-                        // Disable optimization only for external URLs like picsum or if src isn't a string (unlikely here but safe check)
+                        // Disable optimization only for external URLs or if src isn't a string
                          unoptimized={unoptimized}
                     />
                  ) : (
@@ -421,18 +481,28 @@ export default function Home() {
                       <FormControl>
                         <div className="flex flex-col sm:flex-row gap-2">
                           <Input
-                            placeholder="/path/to/your/mapping.xlsx"
-                            {...field}
-                            className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
+                            placeholder="Select mapping.xlsx" // Updated placeholder
+                            {...field} // Spread field props first
+                            value={field.value?.split('/').pop() || ''} // Display only file name
+                            readOnly // Make input read-only, value set by file picker
+                            className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20 cursor-default" /* Adjusted alpha */
                           />
-                           {/* Apply semi-transparent background in light mode */}
+                           {/* Hidden actual file input */}
+                            <input
+                                type="file"
+                                id="fileInput-mappingFile"
+                                style={{ display: 'none' }}
+                                accept=".xlsx" // Accept only Excel files
+                                onChange={(e) => handleFileChange(e, 'mappingFile')}
+                            />
+                           {/* Upload Button triggers hidden input */}
                            <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => handleBrowse('mappingFile')}
+                                onClick={() => triggerFileInput('mappingFile')} // Trigger file input
                                 className="shrink-0 bg-white/50 dark:bg-transparent"
                            >
-                            <Upload className="mr-2 h-4 w-4" /> Upload {/* Changed Icon and Text */}
+                            <Upload className="mr-2 h-4 w-4" /> Upload
                           </Button>
                           <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('mappingFile')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear mapping file path">
                             <XCircle className="h-5 w-5" />
@@ -457,18 +527,28 @@ export default function Home() {
                        <FormControl>
                           <div className="flex flex-col sm:flex-row gap-2">
                             <Input
-                                placeholder={form.watch('isSingleFile') ? "/path/to/playwright/script.py" : "/path/to/playwright/scripts_folder"} // Use watch for dynamic placeholder
-                                {...field}
-                                className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
+                                placeholder={form.watch('isSingleFile') ? "Select script.py" : "Select scripts folder"} // Dynamic placeholder
+                                {...field} // Spread field props first
+                                value={field.value?.split('/').pop() || ''} // Display only file/folder name
+                                readOnly // Make input read-only
+                                className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20 cursor-default" /* Adjusted alpha */
                                 />
-                             {/* Apply semi-transparent background in light mode */}
+                             {/* Hidden actual file input */}
+                                <input
+                                    type="file"
+                                    id="fileInput-inputFileOrFolder"
+                                    style={{ display: 'none' }}
+                                    // Attributes 'accept', 'webkitdirectory', 'directory' are set dynamically in triggerFileInput
+                                    onChange={(e) => handleFileChange(e, 'inputFileOrFolder')}
+                                />
+                             {/* Upload Button triggers hidden input */}
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => handleBrowse('inputFileOrFolder')}
+                                onClick={() => triggerFileInput('inputFileOrFolder')} // Trigger file input
                                 className="shrink-0 bg-white/50 dark:bg-transparent"
                             >
-                                <Upload className="mr-2 h-4 w-4" /> Upload {/* Changed Icon and Text */}
+                                <Upload className="mr-2 h-4 w-4" /> {form.watch('isSingleFile') ? 'Upload File' : 'Upload Folder'}
                             </Button>
                              <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('inputFileOrFolder')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear input file/folder path">
                                 <XCircle className="h-5 w-5" />
@@ -516,18 +596,29 @@ export default function Home() {
                       <FormControl>
                          <div className="flex flex-col sm:flex-row gap-2">
                             <Input
-                              placeholder="/path/to/remember/for/next/time"
-                              {...field}
-                              className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20" /* Adjusted alpha */
+                              placeholder="Select preferred output folder" // Updated placeholder
+                              {...field} // Spread field props first
+                              value={field.value?.split('/').pop() || ''} // Display only folder name
+                              readOnly // Make input read-only
+                              className="flex-grow bg-background/10 dark:bg-background/[0.05] border-border/20 cursor-default" /* Adjusted alpha */
                             />
-                             {/* Apply semi-transparent background in light mode */}
+                             {/* Hidden actual file input */}
+                                <input
+                                    type="file" // Use type="file" even for directories
+                                    id="fileInput-outputFolder"
+                                    style={{ display: 'none' }}
+                                    webkitdirectory="true" // Request directory selection
+                                    directory="true" // Standard attribute for directory
+                                    onChange={(e) => handleFileChange(e, 'outputFolder')}
+                                />
+                             {/* Upload Button triggers hidden input */}
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => handleBrowse('outputFolder')}
+                                onClick={() => triggerFileInput('outputFolder')} // Trigger file input
                                 className="shrink-0 bg-white/50 dark:bg-transparent"
                             >
-                              <Upload className="mr-2 h-4 w-4" /> Upload {/* Changed Icon and Text */}
+                              <Upload className="mr-2 h-4 w-4" /> Upload Folder
                             </Button>
                             <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('outputFolder')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear output folder path">
                                 <XCircle className="h-5 w-5" />
@@ -574,4 +665,4 @@ export default function Home() {
   );
 }
 
-
+    
