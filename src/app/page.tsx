@@ -10,7 +10,7 @@ import Image from 'next/image'; // Import next/image
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle, CardDescription
-import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Mail, Loader2, Sun, Moon } from 'lucide-react'; // Added Info, Mail, Loader2, Sun, Moon
+import { FolderOpen, FileText, CodeXml, XCircle, Download, Info, Mail, Loader2, Sun, Moon, Upload } from 'lucide-react'; // Added Upload, Info, Mail, Loader2, Sun, Moon
 import { useToast } from '@/hooks/use-toast';
 import { savePaths, loadPaths } from '@/lib/path-persistence';
 import { convertCode } from './actions'; // Import server action
@@ -223,7 +223,7 @@ export default function Home() {
   const handleBrowse = async (fieldName: keyof FormValues) => {
     // Placeholder for actual file/folder browsing logic using Electron/Tauri or web APIs
     // This simulation needs to be replaced with real API calls in the target environment.
-    console.warn("File/Folder browsing simulation. Replace with actual dialog API calls.");
+    console.warn("File/Folder browsing/upload simulation. Replace with actual API calls.");
 
     const isSingleFile = form.getValues('isSingleFile');
     const isOutput = fieldName === 'outputFolder';
@@ -277,7 +277,7 @@ export default function Home() {
         });
 
     } catch (err) {
-        console.error("Error using File System Access API (or simulated browse):", err);
+        console.error("Error using File System Access API (or simulated browse/upload):", err);
         // Fallback simulation if web APIs fail or are unavailable
          let simulatedPath = `/simulated/path/to/`;
         if (isMapping) {
@@ -406,7 +406,7 @@ export default function Home() {
       : defaultLogo; // Use defaultLogo before mount
 
      // Determine if optimization should be disabled (only for external URLs)
-     const unoptimized = imageSrc.startsWith('https://');
+     const unoptimized = typeof imageSrc === 'string' && imageSrc.startsWith('https://');
 
 
   return (
@@ -432,8 +432,8 @@ export default function Home() {
                         className="rounded-lg shadow-lg object-contain bg-transparent" // Added bg-transparent
                         priority // Prioritize loading the logo
                         data-ai-hint="abstract logo"
-                        // Disable optimization only for external URLs like picsum
-                        unoptimized={unoptimized}
+                        // Disable optimization only for external URLs like picsum or if src isn't a string (unlikely here but safe check)
+                         unoptimized={unoptimized}
                     />
                  ) : (
                     // Placeholder div with the same dimensions, using the default logo src
@@ -481,7 +481,7 @@ export default function Home() {
                                 onClick={() => handleBrowse('mappingFile')}
                                 className="shrink-0 bg-white/50 dark:bg-transparent"
                            >
-                            <FolderOpen className="mr-2 h-4 w-4" /> Browse
+                            <Upload className="mr-2 h-4 w-4" /> Upload {/* Changed Icon and Text */}
                           </Button>
                           <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('mappingFile')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear mapping file path">
                             <XCircle className="h-5 w-5" />
@@ -517,7 +517,7 @@ export default function Home() {
                                 onClick={() => handleBrowse('inputFileOrFolder')}
                                 className="shrink-0 bg-white/50 dark:bg-transparent"
                             >
-                                <FolderOpen className="mr-2 h-4 w-4" /> Browse
+                                <Upload className="mr-2 h-4 w-4" /> Upload {/* Changed Icon and Text */}
                             </Button>
                              <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('inputFileOrFolder')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear input file/folder path">
                                 <XCircle className="h-5 w-5" />
@@ -576,7 +576,7 @@ export default function Home() {
                                 onClick={() => handleBrowse('outputFolder')}
                                 className="shrink-0 bg-white/50 dark:bg-transparent"
                             >
-                              <FolderOpen className="mr-2 h-4 w-4" /> Browse
+                              <Upload className="mr-2 h-4 w-4" /> Upload {/* Changed Icon and Text */}
                             </Button>
                             <Button type="button" variant="ghost" size="icon" onClick={() => handleClear('outputFolder')} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Clear output folder path">
                                 <XCircle className="h-5 w-5" />
@@ -622,3 +622,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
