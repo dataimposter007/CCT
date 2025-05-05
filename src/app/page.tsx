@@ -22,23 +22,34 @@ import Link from 'next/link'; // Import Link for menu items
 import { Progress } from "@/components/ui/progress"; // Import Progress component
 
 
-// Define Zod schema for form validation
-const FormSchema = z.object({
-  mappingFile: z.string().min(1, 'Mapping file path is required.'),
+// Define Zod schema for form validation (CLIENT-SIDE ONLY version - doesn't check file existence)
+// Server-side validation handles file existence checks.
+const ClientFormSchema = z.object({
+  mappingFile: z.string().min(1, 'Mapping file path is required.')
+    .refine(value => value.endsWith('.xlsx'), { message: 'Mapping file must be an .xlsx file.' }),
   inputFileOrFolder: z.string().min(1, 'Input file/folder path is required.'),
   isSingleFile: z.boolean().default(false).optional(), // Added checkbox state
   outputFolder: z.string().min(1, 'Output folder path is required.'), // Keep for saving path
 });
 
-type FormValues = z.infer<typeof FormSchema>;
 
-// Helper function to trigger download
-function downloadFile(filename: string, content: string) {
-    // Determine MIME type based on filename extension
-    const mimeType = filename.endsWith('.zip') ? 'application/zip' : 'text/plain;charset=utf-8';
-    // For zipping, you'd need a library like JSZip on the client or handle it server-side
-    // This example assumes single file or pre-zipped content
-    const blob = new Blob([content], { type: mimeType });
+type FormValues = z.infer<typeof ClientFormSchema>;
+
+// Helper function to trigger download for plain text or zip buffer
+function downloadFile(filename: string, data: string | Buffer) {
+    let blob: Blob;
+    let mimeType: string;
+
+    if (Buffer.isBuffer(data)) {
+        // Handle zip buffer
+        mimeType = 'application/zip';
+        blob = new Blob([data], { type: mimeType });
+    } else {
+        // Handle plain text (.robot file content)
+        mimeType = 'text/plain;charset=utf-8';
+        blob = new Blob([data], { type: mimeType });
+    }
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -133,7 +144,7 @@ export default function Home() {
 
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(FormSchema),
+    resolver: zodResolver(ClientFormSchema), // Use client-side schema
     defaultValues: {
       mappingFile: '',
       inputFileOrFolder: '',
@@ -153,25 +164,28 @@ export default function Home() {
              if (timer) clearInterval(timer);
              return 95;
           }
-          return prev + 5; // Increment progress
+          // Simulate slower progress for larger tasks (like folder conversion)
+          const increment = form.getValues('isSingleFile') ? 10 : 3;
+          return Math.min(prev + increment, 95); // Ensure it doesn't jump over 95 here
         });
-      }, 150); // Adjust interval for desired speed (matches simulated delay)
+      }, 150); // Adjust interval for desired speed
     } else {
-      // If loading finishes quickly or is cancelled, ensure progress reaches 100
-       if (progressValue > 0 && progressValue < 100) {
+       // If loading finishes quickly or is cancelled, ensure progress reaches 100
+        if (progressValue > 0 && progressValue < 100) {
            setProgressValue(100);
            // Optional: Hide progress bar after a short delay
            // setTimeout(() => setProgressValue(0), 500);
-       } else if (progressValue === 100) {
-          // Optional: Hide progress bar after a short delay
-         // setTimeout(() => setProgressValue(0), 500);
-       }
+        } else if (progressValue === 100) {
+           // Optional: Hide progress bar after a short delay
+          // setTimeout(() => setProgressValue(0), 500);
+        }
        // else progress is 0, do nothing
     }
 
     return () => { // Cleanup interval on unmount or when isLoading changes
       if (timer) clearInterval(timer);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, progressValue]); // Added progressValue dependency to handle setting to 100% correctly
 
 
@@ -186,6 +200,7 @@ export default function Home() {
           toast({
             title: 'Paths Loaded',
             description: 'Default paths loaded successfully.',
+             duration: 2000, // Shorter duration for info toasts
           });
         }
       } catch (error) {
@@ -206,28 +221,82 @@ export default function Home() {
   }, [toast]); // Removed form from dependency array to prevent potential re-runs
 
   const handleBrowse = async (fieldName: keyof FormValues) => {
-    // Placeholder for actual file/folder browsing logic
-    // In a real Electron/Tauri app, you'd use dialog APIs.
-    // In a web app, you'd use <input type="file"> or specific directory APIs.
+    // Placeholder for actual file/folder browsing logic using Electron/Tauri or web APIs
+    // This simulation needs to be replaced with real API calls in the target environment.
+    console.warn("File/Folder browsing simulation. Replace with actual dialog API calls.");
+
     const isSingleFile = form.getValues('isSingleFile');
     const isOutput = fieldName === 'outputFolder';
     const isMapping = fieldName === 'mappingFile';
+    const isInput = fieldName === 'inputFileOrFolder';
 
-    let simulatedPath = `/path/to/simulated/`;
-    if (isMapping) {
-        simulatedPath += 'mapping.xlsx';
-    } else if (isOutput) {
-        simulatedPath += 'output_folder';
-    } else { // inputFileOrFolder
-        simulatedPath += isSingleFile ? 'playwright_script.py' : 'playwright_scripts_folder';
+    // Basic properties for a file/folder dialog
+    const properties: ('openFile' | 'openDirectory')[] = isOutput || (isInput && !isSingleFile)
+        ? ['openDirectory']
+        : ['openFile'];
+
+    // Try to use window.showOpenFilePicker or showDirectoryPicker if available (modern browsers)
+    // Note: These APIs might have security restrictions.
+    try {
+        let selectedPath = '';
+        if (properties.includes('openDirectory')) {
+            // @ts-ignore - showDirectoryPicker might not be typed
+             if (typeof window.showDirectoryPicker === 'function') {
+                 // @ts-ignore
+                const handle = await window.showDirectoryPicker();
+                // We can't get the full path directly for security reasons in standard web APIs.
+                // This simulation will just set a placeholder name.
+                // For Electron/Tauri, you'd get the actual path from the dialog result.
+                selectedPath = `/path/to/selected/folder/${handle.name}`; // Placeholder
+                form.setValue(fieldName, selectedPath);
+             } else {
+                  throw new Error("showDirectoryPicker not available.");
+             }
+
+        } else { // openFile
+             // @ts-ignore - showOpenFilePicker might not be typed
+             if (typeof window.showOpenFilePicker === 'function') {
+                const options = {
+                     types: isMapping ? [{ description: 'Excel Files', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }] :
+                           isInput ? [{ description: 'Python Files', accept: { 'text/x-python': ['.py'] } }] : [],
+                     multiple: false,
+                 };
+                 // @ts-ignore
+                 const [fileHandle] = await window.showOpenFilePicker(options);
+                 selectedPath = `/path/to/selected/file/${fileHandle.name}`; // Placeholder
+                 form.setValue(fieldName, fileHandle.name); // Set to file name only for web
+             } else {
+                  throw new Error("showOpenFilePicker not available.");
+             }
+        }
+
+         toast({
+            title: "Path Selected (Simulated)",
+            description: `Set ${fieldName} to: ${selectedPath || 'Selected item'}`,
+             duration: 3000,
+        });
+
+    } catch (err) {
+        console.error("Error using File System Access API (or simulated browse):", err);
+        // Fallback simulation if web APIs fail or are unavailable
+         let simulatedPath = `/simulated/path/to/`;
+        if (isMapping) {
+            simulatedPath += 'mapping.xlsx';
+        } else if (isOutput) {
+            simulatedPath += 'output_folder';
+        } else { // inputFileOrFolder
+            simulatedPath += isSingleFile ? 'playwright_script.py' : 'playwright_scripts_folder';
+        }
+         form.setValue(fieldName, simulatedPath);
+         toast({
+            title: "Path Selected (Fallback Simulation)",
+            description: `Set ${fieldName} to: ${simulatedPath}`,
+            variant: "default",
+            duration: 3000,
+          });
     }
-
-    form.setValue(fieldName, simulatedPath);
-     toast({
-        title: "Path Selected (Simulated)",
-        description: `Set ${fieldName} to: ${simulatedPath}`,
-      });
   };
+
 
   const handleClear = (fieldName: keyof FormValues) => {
     form.setValue(fieldName, '');
@@ -235,38 +304,53 @@ export default function Home() {
         title: "Path Cleared",
         description: `${fieldName} path cleared.`,
         variant: "default",
+         duration: 1500,
       });
   };
 
 
-  const onSubmit: SubmitHandler<FormValues> = async (data) => {
+ const onSubmit: SubmitHandler<FormValues> = async (data) => {
     setIsLoading(true);
     setProgressValue(0); // Reset progress on new submission
-    console.log("Form submitted with data:", data);
+    console.log("Form submitted with client data:", data);
+
+    // Perform client-side validation again before submitting (optional redundancy)
+    const validation = ClientFormSchema.safeParse(data);
+    if (!validation.success) {
+        toast({
+            title: 'Invalid Input',
+            description: validation.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
+            variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+    }
+
+
     try {
-      // Save paths before starting conversion
+      // Save paths before starting conversion (consider doing this only on success?)
       await savePaths(data);
       toast({
         title: 'Paths Saved',
         description: 'Current paths saved as default.',
+        duration: 2000,
       });
 
       // Call the server action for conversion
       const result = await convertCode(data);
 
-      // Ensure progress reaches 100% even if conversion is instant
-      // Use setTimeout to allow the progress bar to update visually before reaching 100
-      await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
+      // Ensure progress reaches 100% even if conversion is fast
+      await new Promise(resolve => setTimeout(resolve, 50)); // Small delay for UI update
       setProgressValue(100);
 
 
-      if (result.success && result.fileContent && result.fileName) {
+      if (result.success && (result.fileContent || result.zipBuffer) && result.fileName) {
         toast({
           title: 'Conversion Successful',
           description: `${result.message || 'Starting download...'}`,
         });
-        // Trigger the download using the helper function
-        downloadFile(result.fileName, result.fileContent);
+        // Trigger download: Pass either fileContent (string) or zipBuffer (Buffer)
+        downloadFile(result.fileName, result.fileContent ?? result.zipBuffer!);
       } else {
         toast({
           title: 'Conversion Failed',
@@ -281,7 +365,14 @@ export default function Home() {
         setProgressValue(100);
         let errorMessage = 'An unexpected error occurred during conversion.';
         if (error instanceof Error) {
-            errorMessage = error.message;
+            // Provide more specific feedback for common errors
+            if (error.message.includes('ENOENT') || error.message.includes('not found')) {
+                errorMessage = 'File or folder not found. Please check the paths.';
+            } else if (error.message.includes('permission')) {
+                errorMessage = 'Permission denied. Check file/folder permissions.';
+            } else {
+                 errorMessage = error.message;
+            }
         }
         toast({
             title: 'Conversion Error',
@@ -293,14 +384,14 @@ export default function Home() {
        // Optional: Reset progress bar after a short delay, ensuring it was 100 first
        setTimeout(() => {
            if (progressValue === 100) { // Check if it actually reached 100
-                // setProgressValue(0); // Uncomment to hide bar after success/error
+                setProgressValue(0); // Reset progress bar after completion/error
            }
-       }, 1000); // Delay before potentially hiding
+       }, 1500); // Delay before hiding/resetting
     }
   };
 
+
    // Determine image source based on theme, but only after mount
-   // Ensure local paths start with '/' for next/image - assumes image is in `public` folder
     const lightLogo = "/logolight.png"; // Path to the local light mode logo in public folder
     const darkLogoPlaceholder = "https://picsum.photos/240/240?random=1"; // Using placeholder for dark
 
@@ -346,7 +437,8 @@ export default function Home() {
                     />
                  ) : (
                     // Placeholder div with the same dimensions, using the default logo src
-                    <div style={{ width: 240, height: 240 }} className="bg-muted/20 rounded-lg shadow-lg animate-pulse">
+                    // Adding role and aria-label for accessibility during loading state
+                    <div role="img" aria-label="Loading logo..." style={{ width: 240, height: 240 }} className="bg-muted/20 rounded-lg shadow-lg animate-pulse">
                        {/* Preload the default image to potentially improve LCP */}
                        <link rel="preload" as="image" href={defaultLogo} />
                     </div>
@@ -409,7 +501,7 @@ export default function Home() {
                     <FormItem>
                       <FormLabel className="flex items-center gap-2 text-foreground/90 dark:text-foreground/80">
                         <CodeXml className="h-5 w-5 text-primary" />
-                        Playwright Python Input
+                        Playwright Python Input (File or Folder)
                       </FormLabel>
                        <FormControl>
                           <div className="flex flex-col sm:flex-row gap-2">
@@ -491,7 +583,7 @@ export default function Home() {
                             </Button>
                           </div>
                       </FormControl>
-                       <p className="text-xs text-muted-foreground mt-1">This path is saved for convenience but the output file will be downloaded directly to your browser.</p>
+                       <p className="text-xs text-muted-foreground mt-1">This path is saved for convenience but the output file will be downloaded directly to your browser's default download location.</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -502,7 +594,7 @@ export default function Home() {
                 <div className="flex flex-col gap-4 pt-6 border-t mt-6 border-border/20"> {/* Adjusted border alpha */}
                      {/* Progress Bar */}
                      {/* Always render Progress container, but control visibility with opacity */}
-                     <div className={`transition-opacity duration-300 ${isLoading || progressValue > 0 ? 'opacity-100 h-auto' : 'opacity-0 h-0'}`}> {/* Make visible if loading or if progress is > 0 */}
+                     <div className={`transition-opacity duration-300 ${isLoading || progressValue > 0 ? 'opacity-100 min-h-[20px]' : 'opacity-0 min-h-[0px] h-0'}`}> {/* Make visible if loading or if progress is > 0, ensure space */}
                         <div className="flex items-center space-x-2">
                             <Progress value={progressValue} className="w-full h-2 transition-all duration-150 ease-linear" />
                              <span className="text-xs font-mono text-muted-foreground min-w-[40px] text-right">{`${Math.round(progressValue)}%`}</span>

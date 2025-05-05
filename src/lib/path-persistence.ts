@@ -8,7 +8,7 @@ import os from 'os';
 interface Paths {
   mappingFile: string;
   inputFileOrFolder: string;
-  isSingleFile?: boolean; // Make optional here as well for flexibility
+  isSingleFile?: boolean; // Keep optional for initial flexibility
   outputFolder: string;
 }
 
@@ -39,23 +39,50 @@ export async function savePaths(paths: Paths): Promise<void> {
 export async function loadPaths(): Promise<Paths | null> {
   try {
     const data = await fs.readFile(filePath, 'utf-8');
-    const paths: Paths = JSON.parse(data);
-    console.log('Paths loaded successfully from:', filePath);
-    // Ensure isSingleFile exists in the loaded object, default if not
-    return { ...paths, isSingleFile: paths.isSingleFile ?? false };
+    const loadedData: Partial<Paths> = JSON.parse(data); // Parse as partial first
+    console.log('Raw paths loaded from:', filePath, loadedData);
+
+     // Validate required fields and types
+     if (typeof loadedData.mappingFile !== 'string' ||
+         typeof loadedData.inputFileOrFolder !== 'string' ||
+         typeof loadedData.outputFolder !== 'string') {
+         console.warn('Loaded paths data is missing required fields or has incorrect types. Ignoring.');
+         return null; // Or throw an error if strict validation is needed
+     }
+
+     // Ensure isSingleFile is boolean, default to false if missing or wrong type
+     const isSingleFile = typeof loadedData.isSingleFile === 'boolean' ? loadedData.isSingleFile : false;
+
+
+    const paths: Paths = {
+        mappingFile: loadedData.mappingFile,
+        inputFileOrFolder: loadedData.inputFileOrFolder,
+        outputFolder: loadedData.outputFolder,
+        isSingleFile: isSingleFile, // Use validated/defaulted value
+    };
+
+    console.log('Validated paths loaded successfully:', paths);
+    return paths;
+
   } catch (error) {
     // It's common for the file not to exist initially, handle this gracefully.
      if (error instanceof Error && error.code === 'ENOENT') {
       console.log('Default paths file not found, returning null.');
       return null; // File doesn't exist, return null
     }
+     if (error instanceof SyntaxError) {
+         console.error('Error parsing paths JSON:', error);
+         // Optionally delete the corrupt file? fs.unlink(filePath);
+         return null; // Invalid JSON, treat as no saved paths
+     }
     // Log other errors but still return null or throw, depending on desired behavior
     console.error('Error loading paths:', error);
     if (error instanceof Error) {
-       throw new Error(`Failed to load paths: ${error.message}`); // Re-throw other errors
+       // Don't throw for generic load error, just return null
+       // throw new Error(`Failed to load paths: ${error.message}`);
+       return null;
     }
-     throw new Error('An unknown error occurred while loading paths.');
+     // throw new Error('An unknown error occurred while loading paths.');
+     return null; // Fallback to null for unknown errors
   }
 }
-
-      
