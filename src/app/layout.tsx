@@ -27,8 +27,7 @@ export default function RootLayout({
         {/* Apply font variable and fallback, removed font-sans */}
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          forcedTheme="dark" // Force dark theme
           disableTransitionOnChange
         >
           {children}
