@@ -1,4 +1,3 @@
-
 'use client';
 
 import type React from 'react';
@@ -57,8 +56,9 @@ const MenuBar = ({ onAboutClick }: MenuBarProps) => {
     return (
         <nav className="w-full flex justify-between items-baseline py-3 px-4 sm:px-6 mb-4 rounded-md bg-card/60 dark:bg-card/50 backdrop-blur-sm border border-border/30 shadow-sm">
             <div className="flex items-baseline space-x-4">
+                 {/* Changed NOKIA to CCT */}
                  <span className="text-3xl font-extrabold text-primary mr-6">
-                    NOKIA
+                    CCT
                  </span>
                 {/* Updated About button to use the passed handler */}
                 <Button variant="ghost" className="hover:bg-accent/80 hover:text-accent-foreground px-3 py-1.5 h-auto" onClick={onAboutClick}>
@@ -410,7 +410,7 @@ export default function Home() {
             // Fallback to a placeholder if the intended image fails
             setImageSrc(darkLogoPlaceholder);
         } else {
-            // console.log(`Image loaded successfully: ${target.src}`); // Uncomment for debugging successful loads
+            // console.error(`Image failed to load: ${target.src}`); // Uncomment for debugging successful loads
         }
     };
 
@@ -668,4 +668,3 @@ export default function Home() {
     </main>
   );
 }
-
