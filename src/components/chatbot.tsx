@@ -36,37 +36,39 @@ interface ChoiceButtonsProps {
 }
 const ChoiceButtons: React.FC<ChoiceButtonsProps> = ({ onChoice, disabled }) => {
     return (
-        // Changed flex-row to flex-col and added sm:flex-row for responsiveness
-        <div className="flex flex-col sm:flex-row gap-2 mt-2">
+        // Use flex-wrap to allow buttons to wrap onto the next line if needed
+        // Reduced gap slightly, adjusted padding for better fit
+        <div className="flex flex-wrap gap-1.5 mt-2">
             <Button
                 variant="outline"
                 size="sm"
-                className="justify-start text-left h-auto py-1.5 px-3 bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
+                // Adjusted padding and text size slightly
+                className="flex-grow sm:flex-grow-0 justify-start text-left h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
                 onClick={() => onChoice('rf')}
                 disabled={disabled}
             >
-                <HelpCircle className="w-4 h-4 mr-2 text-primary/80" />
+                <HelpCircle className="w-3.5 h-3.5 mr-1.5 text-primary/80" />
                 Robot Framework queries
             </Button>
             <Button
                 variant="outline"
                 size="sm"
-                className="justify-start text-left h-auto py-1.5 px-3 bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
+                className="flex-grow sm:flex-grow-0 justify-start text-left h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
                 onClick={() => onChoice('website')}
                 disabled={disabled}
             >
-                <MessageSquareWarning className="w-4 h-4 mr-2 text-primary/80" />
+                <MessageSquareWarning className="w-3.5 h-3.5 mr-1.5 text-primary/80" />
                 Website related issues
             </Button>
             <Button
                 variant="outline"
                 size="sm"
-                className="justify-start text-left h-auto py-1.5 px-3 bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
+                className="flex-grow sm:flex-grow-0 justify-start text-left h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 hover:bg-primary/10 hover:border-primary/50 border border-border/30 disabled:opacity-50"
                 onClick={() => onChoice('feedback')}
                 disabled={disabled}
             >
-                <Mail className="w-4 h-4 mr-2 text-primary/80" />
-                Suggest new updates/feedback
+                <Mail className="w-3.5 h-3.5 mr-1.5 text-primary/80" />
+                Suggest updates/feedback
             </Button>
         </div>
     );
@@ -169,6 +171,12 @@ export default function Chatbot() {
     } finally {
         setIsLoading(false);
         // Keep focus management logic if needed
+        if (choice === 'feedback') {
+           setTimeout(() => {
+                const inputElement = document.getElementById('chat-input');
+                inputElement?.focus();
+            }, 0);
+        }
     }
   };
 
@@ -188,20 +196,25 @@ export default function Chatbot() {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
+        // Call the server action to send feedback
+        console.log(`Attempting to send feedback: "${trimmedInput}"`);
         const feedbackResult = await sendFeedbackEmail(trimmedInput);
+        console.log("Feedback send result:", feedbackResult);
 
         if (feedbackResult.success) {
             addMessage('bot', 'Thank you for your feedback! We have received it.\nIs there anything else I can help with?', true); // Show buttons again
             toast({
                 title: "Feedback Sent",
-                description: "Your feedback has been recorded.",
+                description: "Your feedback has been recorded (simulated).", // Indicate simulation
                 variant: "default",
             });
         } else {
-            addMessage('bot', `Sorry, there was an error sending your feedback${feedbackResult.error ? ': ' + feedbackResult.error : '.'}. Please try again later.\nIs there anything else I can help with?`, true); // Show buttons again
+             // Provide more context if there's an error message from the action
+             const errorMsg = feedbackResult.error ? `: ${feedbackResult.error}` : '.';
+            addMessage('bot', `Sorry, there was an error sending your feedback${errorMsg} Please try again later.\nIs there anything else I can help with?`, true); // Show buttons again
             toast({
                 title: "Feedback Error",
-                description: feedbackResult.error || "Could not send feedback.",
+                description: feedbackResult.error || "Could not send feedback (simulated).", // Indicate simulation
                 variant: "destructive",
             });
         }
@@ -212,7 +225,7 @@ export default function Chatbot() {
       setChatState('awaiting_choice');
        toast({
            title: "Feedback Error",
-           description: "An unexpected error occurred sending your feedback.",
+           description: "An unexpected error occurred sending your feedback (simulated).", // Indicate simulation
            variant: "destructive",
        });
     } finally {
@@ -284,7 +297,7 @@ export default function Chatbot() {
               >
                 <div
                   className={cn(
-                    "max-w-[80%] rounded-lg px-3 py-2 text-sm break-words shadow-sm",
+                    "max-w-[85%] rounded-lg px-3 py-2 text-sm break-words shadow-sm", // Increased max-width slightly
                     message.sender === 'user'
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-foreground border border-border/10"
@@ -342,7 +355,7 @@ export default function Chatbot() {
               // Only enable send button when in feedback state and not loading/processing
               disabled={isLoading || chatState !== 'awaiting_feedback' || inputValue.trim() === ''}
               className="h-9 w-9"
-              aria-label={isLoading ? "Sending..." : "Send message"}
+              aria-label={isLoading && chatState === 'processing_feedback' ? "Sending..." : "Send message"} // More specific aria-label
             >
               {isLoading && chatState === 'processing_feedback' ? ( // Show loader specifically for feedback processing
                 <Loader2 className="w-4 h-4 animate-spin" />

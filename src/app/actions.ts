@@ -12,7 +12,7 @@ import { chatFlow, type ChatFlowInput } from '@/ai/flows/chat-flow'; // Import c
 // Environment variables for email credentials are also required.
 async function sendEmail(subject: string, textBody: string): Promise<{ success: boolean, error?: string }> {
     console.warn("--- Email Sending Simulation ---");
-    console.log(`To: bhargavams222@gmail.com`);
+    console.log(`Attempting to send email to: bhargavams222@gmail.com`); // Added log
     console.log(`Subject: ${subject}`);
     console.log(`Body:\n${textBody}`);
     console.warn("--- End Email Sending Simulation ---");
@@ -58,6 +58,7 @@ async function sendEmail(subject: string, textBody: string): Promise<{ success: 
 
     // For now, simulate success
      await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
+    console.log("Email simulation completed successfully."); // Added log
     return { success: true };
 }
 
@@ -1007,7 +1008,9 @@ interface FeedbackResult {
     error?: string;
 }
 export async function sendFeedbackEmail(feedback: string): Promise<FeedbackResult> {
+     console.log("sendFeedbackEmail action called with feedback:", feedback); // Added log
     if (!feedback || typeof feedback !== 'string' || feedback.trim().length === 0) {
+        console.error("Feedback validation failed: Feedback is empty."); // Added log
         return { success: false, error: 'Feedback cannot be empty.' };
     }
 
@@ -1015,12 +1018,15 @@ export async function sendFeedbackEmail(feedback: string): Promise<FeedbackResul
     const textBody = `User submitted the following feedback:\n\n"${feedback.trim()}"`;
 
     try {
+        console.log("Calling sendEmail function..."); // Added log
         const emailResult = await sendEmail(subject, textBody);
+        console.log("sendEmail function result:", emailResult); // Added log
+
         if (emailResult.success) {
             console.log('Feedback email simulated/sent successfully.');
             return { success: true };
         } else {
-            console.error('Failed to send feedback email:', emailResult.error);
+            console.error('Failed to send feedback email (from sendEmail):', emailResult.error);
             return { success: false, error: emailResult.error || 'Failed to send feedback email.' };
         }
     } catch (error: any) {
