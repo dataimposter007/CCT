@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Basic chatbot flow using Genkit.
+ * @fileOverview Basic chatbot flow using Genkit, behaving like Gemini.
  *
  * - chatFlow - Handles the chat conversation.
  * - ChatFlowInput - Input schema for the chat flow.
@@ -28,8 +28,9 @@ const chatPrompt = ai.definePrompt({
     name: 'chatPrompt',
     input: { schema: ChatFlowInputSchema },
     output: { schema: ChatFlowOutputSchema },
-    prompt: `You are a helpful assistant integrated into a Playwright-to-Robot-Framework conversion tool.
-Answer the user's question concisely.
+    // Updated prompt to instruct the model to act like Gemini
+    prompt: `You are a large language model, trained by Google.
+Respond to the user's message conversationally and helpfully. Behave like the free version of Google Gemini.
 
 User message: {{{message}}}
 Answer:`,
